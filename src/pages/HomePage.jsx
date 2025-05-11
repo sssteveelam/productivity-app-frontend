@@ -5,6 +5,11 @@ export default function HomePage() {
   const [greeting, setGreeting] = useState();
   const navigate = useNavigate();
 
+  // State cho trích dẫn, loading và error
+  const [currentQuote, setCurrentQuote] = useState({ text: "", author: "" });
+  const [quoteLoading, setQuoteLoading] = useState(true);
+  const [quoteError, setQuoteError] = useState(null);
+
   useEffect(() => {
     const token = localStorage.getItem("userToken");
 
@@ -54,6 +59,48 @@ export default function HomePage() {
     setGreeting(getGreetingMessage(currentHour));
   }, [currentTime.getHours()]);
 
+  // --- CẬP NHẬT EFFECT ĐỂ LẤY TRÍCH DẪN TỪ API ---
+
+  useEffect(() => {
+    const fetchQuote = async () => {
+      setQuoteLoading(true);
+      setQuoteError(null);
+
+      try {
+        // Gọi API của ZenQuotes
+        const response = await fetch("http://localhost:5001/api/quote/random");
+
+        // Kiểm tra xem request có thành công không
+        if (!response.ok) {
+          throw new Error(`Lỗi HTTP! Status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data && data.q && data.a) {
+          // Kiểm tra các thuộc tính cần thiết q (quote) và a (author)
+          setCurrentQuote({ text: data.q, author: data.a });
+        } else {
+          throw new Error("Dữ liệu trích dẫn không hợp lệ từ server.");
+        }
+      } catch (error) {
+        console.error("Không thể tải trích dẫn từ API:", error);
+        setQuoteError(
+          "Rất tiếc, không thể tải trích dẫn lúc này. Vui lòng thử lại sau."
+        );
+
+        setCurrentQuote({
+          text: "Nơi nào có ý chí, nơi đó có con đường.",
+          author: "Ngạn ngữ",
+        });
+      } finally {
+        setQuoteLoading(false);
+      }
+    };
+
+    fetchQuote();
+  }, []);
+
   return (
     <div
       style={{
@@ -86,10 +133,43 @@ export default function HomePage() {
         {greeting}
       </div>
 
-      <h1>Chào mừng đến với Ứng dụng Năng suất!</h1>
-      <p>
-        Đây là trang chủ của bạn. Các tính năng chính sẽ được phát triển ở đây.
-      </p>
+      {/* --- HIỂN THỊ TRÍCH DẪN, LOADING, HOẶC ERROR --- */}
+      <div
+        style={{
+          minHeight: "100px", // Đặt chiều cao tối thiểu để layout không bị giật khi nội dung thay đổi
+          fontStyle: "italic",
+          margin: "0 20px 40px 20px",
+          color: "#666",
+          maxWidth: "700px",
+          padding: "15px",
+          borderLeft: "3px solid #007bff",
+          backgroundColor: "#f8f9fa",
+        }}>
+        {quoteLoading && <p>Đang tải trích dẫn...</p>}
+        {quoteError && <p style={{ color: "red" }}>{quoteError}</p>}
+        {!quoteLoading && !quoteError && currentQuote.text && (
+          <>
+            <p
+              style={{
+                fontSize: "clamp(1rem, 2.5vw, 1.3rem)",
+                marginBottom: "10px",
+                lineHeight: "1.6",
+              }}>
+              "{currentQuote.text}"
+            </p>
+            {currentQuote.author && (
+              <p
+                style={{
+                  fontSize: "clamp(0.9rem, 2vw, 1.1rem)",
+                  textAlign: "right",
+                  color: "#007bff",
+                }}>
+                - {currentQuote.author}
+              </p>
+            )}
+          </>
+        )}
+      </div>
 
       <button
         onClick={handleLogout}
