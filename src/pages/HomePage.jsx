@@ -1,11 +1,12 @@
+// File: frontend/src/components/HomePage.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 export default function HomePage() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [greeting, setGreeting] = useState();
   const navigate = useNavigate();
 
-  // State cho trích dẫn, loading và error
   const [currentQuote, setCurrentQuote] = useState({ text: "", author: "" });
   const [quoteLoading, setQuoteLoading] = useState(true);
   const [quoteError, setQuoteError] = useState(null);
@@ -17,7 +18,6 @@ export default function HomePage() {
       navigate("/login");
     }
 
-    // --- LOGIC CHO ĐỒNG HỒ ---
     const timerId = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
@@ -28,11 +28,10 @@ export default function HomePage() {
   }, [navigate]);
 
   const handleLogout = () => {
-    localStorage.removeItem("userToken"); // Xóa token
+    localStorage.removeItem("userToken");
     navigate("/login");
   };
 
-  // format time
   const formatTime = (date) => {
     const hours = date.getHours().toString().padStart(2, "0");
     const minutes = date.getMinutes().toString().padStart(2, "0");
@@ -41,7 +40,6 @@ export default function HomePage() {
     return `${hours}:${minutes}:${seconds}`;
   };
 
-  // get Welcome message
   const getGreetingMessage = (hour) => {
     if (hour >= 5 && hour < 12) {
       return `Chào buổi sáng!`;
@@ -57,9 +55,7 @@ export default function HomePage() {
   useEffect(() => {
     const currentHour = currentTime.getHours();
     setGreeting(getGreetingMessage(currentHour));
-  }, [currentTime.getHours()]);
-
-  // --- CẬP NHẬT EFFECT ĐỂ LẤY TRÍCH DẪN TỪ API ---
+  }, [currentTime]); // Changed dependency to currentTime to ensure re-evaluation on each second (or any time update)
 
   useEffect(() => {
     const fetchQuote = async () => {
@@ -67,10 +63,8 @@ export default function HomePage() {
       setQuoteError(null);
 
       try {
-        // Gọi API của ZenQuotes
         const response = await fetch("http://localhost:5001/api/quote/random");
 
-        // Kiểm tra xem request có thành công không
         if (!response.ok) {
           throw new Error(`Lỗi HTTP! Status: ${response.status}`);
         }
@@ -78,7 +72,6 @@ export default function HomePage() {
         const data = await response.json();
 
         if (data && data.q && data.a) {
-          // Kiểm tra các thuộc tính cần thiết q (quote) và a (author)
           setCurrentQuote({ text: data.q, author: data.a });
         } else {
           throw new Error("Dữ liệu trích dẫn không hợp lệ từ server.");
@@ -102,68 +95,50 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center", // Căn giữa các item theo chiều ngang
-        justifyContent: "center", // Căn giữa các item theo chiều dọc (nếu HomePage chiếm toàn bộ chiều cao)
-        minHeight: "80vh", // Giúp căn giữa theo chiều dọc tốt hơn
-        padding: "20px",
-        textAlign: "center", // Căn giữa text bên trong các phần tử con
-      }}>
-      {/* 1. Đồng hồ */}
-      <div
-        style={{
-          fontSize: "clamp(3rem, 10vw, 6rem)",
-          fontWeight: "bold",
-          margin: "20px 0 30px 0",
-          color: "#333",
-        }}>
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-8 bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 text-center">
+      <div className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-extrabold text-gray-900 drop-shadow-lg my-8">
         {formatTime(currentTime)}
       </div>
 
-      {/* 2. Lời chào */}
-      <div
-        style={{
-          fontSize: "clamp(1.2rem, 3vw, 1.8rem)",
-          margin: "0 0 30px 0",
-          color: "#555",
-        }}>
+      <div className="text-2xl sm:text-3xl md:text-4xl text-gray-700 font-medium mb-8 drop-shadow-sm">
         {greeting}
       </div>
 
-      {/* --- HIỂN THỊ TRÍCH DẪN, LOADING, HOẶC ERROR --- */}
-      <div
-        style={{
-          minHeight: "100px", // Đặt chiều cao tối thiểu để layout không bị giật khi nội dung thay đổi
-          fontStyle: "italic",
-          margin: "0 20px 40px 20px",
-          color: "#666",
-          maxWidth: "700px",
-          padding: "15px",
-          borderLeft: "3px solid #007bff",
-          backgroundColor: "#f8f9fa",
-        }}>
-        {quoteLoading && <p>Đang tải trích dẫn...</p>}
-        {quoteError && <p style={{ color: "red" }}>{quoteError}</p>}
+      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-xl p-6 sm:p-8 border-l-8 border-indigo-600 min-h-[150px] flex flex-col justify-center items-center transition-all duration-500 ease-in-out hover:shadow-2xl hover:scale-[1.01] cursor-pointer">
+        {quoteLoading && (
+          <div className="flex items-center justify-center text-center text-gray-600 italic animate-pulse">
+            <svg
+              className="animate-spin h-6 w-6 mr-3 text-indigo-500"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24">
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Đang tải trích dẫn truyền cảm hứng...
+          </div>
+        )}
+        {quoteError && (
+          <p className="text-center text-red-600 font-semibold text-lg">
+            {quoteError}
+          </p>
+        )}
         {!quoteLoading && !quoteError && currentQuote.text && (
           <>
-            <p
-              style={{
-                fontSize: "clamp(1rem, 2.5vw, 1.3rem)",
-                marginBottom: "10px",
-                lineHeight: "1.6",
-              }}>
+            <p className="text-lg sm:text-xl italic leading-relaxed mb-4 text-gray-800 font-serif">
               "{currentQuote.text}"
             </p>
             {currentQuote.author && (
-              <p
-                style={{
-                  fontSize: "clamp(0.9rem, 2vw, 1.1rem)",
-                  textAlign: "right",
-                  color: "#007bff",
-                }}>
+              <p className="text-base sm:text-lg font-semibold text-right text-indigo-700 w-full pr-2">
                 - {currentQuote.author}
               </p>
             )}
@@ -173,15 +148,9 @@ export default function HomePage() {
 
       <button
         onClick={handleLogout}
-        style={{
-          padding: "10px 15px",
-          backgroundColor: "#dc3545",
-          color: "white",
-          border: "none",
-          borderRadius: "4px",
-          cursor: "pointer",
-          marginTop: "30px",
-        }}>
+        className="mt-12 px-8 py-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg
+                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500
+                   transition duration-300 ease-in-out transform hover:scale-105 hover:shadow-xl active:scale-100 active:bg-red-800">
         Đăng Xuất
       </button>
     </div>
