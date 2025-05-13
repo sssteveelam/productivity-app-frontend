@@ -11,7 +11,6 @@ export default function TodoPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Hàm để lấy danh sách công việc
   const fetchTasks = async () => {
     setIsLoading(true);
     setError(null);
@@ -22,7 +21,6 @@ export default function TodoPage() {
     } catch (err) {
       console.error("Lỗi khi tải danh sách công việc:", err);
       setError("Không thể tải danh sách công việc. Vui lòng thử lại.");
-      // Nếu lỗi là do chưa đăng nhập (ví dụ 401), có thể điều hướng về trang login
       if (
         err.response &&
         (err.response.status === 401 || err.response.status === 403)
@@ -45,7 +43,6 @@ export default function TodoPage() {
     fetchTasks();
   }, [navigate]);
 
-  // --- HÀM XỬ LÝ THÊM CÔNG VIỆC MỚI ---
   const handleAddTask = async (e) => {
     e.preventDefault();
 
@@ -57,8 +54,8 @@ export default function TodoPage() {
 
     try {
       const response = await taskService.createTask({ text: newTaskText });
-      // Thêm công việc mới vào đầu danh sách hiện tại
       setTasks((prevTasks) => [response.data, ...prevTasks]);
+
       setNewTaskText("");
     } catch (err) {
       console.error("Lỗi khi thêm công việc:", err);
@@ -75,7 +72,6 @@ export default function TodoPage() {
     }
   };
 
-  // --- HÀM XỬ LÝ THAY ĐỔI TRẠNG THÁI HOÀN THÀNH ---
   const handleToggleComplete = async (taskToUpdate) => {
     setError(null);
 
@@ -89,7 +85,6 @@ export default function TodoPage() {
         updatedTaskPayload
       );
 
-      // Cập nhật lại task trong danh sách tasks state
       setTasks((prevTasks) =>
         prevTasks.map((task) =>
           task._id === taskToUpdate._id ? response.data : task
@@ -110,9 +105,7 @@ export default function TodoPage() {
     }
   };
 
-  // --- HÀM XỬ LÝ XÓA CÔNG VIỆC ---
   const handleDeleteTask = async (taskId) => {
-    // Tùy chọn: Thêm hộp thoại xác nhận trước khi xóa
     if (!window.confirm("Bạn có chắc chắn muốn xóa công việc này không?")) {
       return;
     }
@@ -120,7 +113,6 @@ export default function TodoPage() {
 
     try {
       await taskService.deleteTask(taskId);
-      // Loại bỏ task đã xóa khỏi danh sách tasks state
       setTasks((prevTasks) => prevTasks.filter((task) => task._id !== taskId));
     } catch (err) {
       console.error("Lỗi khi xóa công việc:", err);
@@ -139,160 +131,113 @@ export default function TodoPage() {
 
   if (isLoading) {
     return (
-      <div style={{ padding: "20px", textAlign: "center" }}>
-        Đang tải danh sách công việc...
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100">
+        <div className="text-center text-gray-700 text-xl font-semibold flex items-center">
+          <svg
+            className="animate-spin h-6 w-6 mr-3 text-indigo-500"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24">
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Đang tải danh sách công việc...
+        </div>
       </div>
     );
   }
 
   return (
-    <div
-      style={{
-        maxWidth: "700px",
-        margin: "30px auto",
-        padding: "25px",
-        fontFamily: "Arial, sans-serif",
-        boxShadow: "0 2px 15px rgba(0,0,0,0.1)",
-        borderRadius: "10px",
-        backgroundColor: "#fff",
-      }}>
-      <PomodoroTimer />
-      <h1
-        style={{
-          textAlign: "center",
-          color: "#2c3e50",
-          marginBottom: "30px",
-          fontSize: "2rem",
-        }}>
-        Công Việc Cần Làm
-      </h1>
-      <form
-        onSubmit={handleAddTask}
-        style={{ display: "flex", marginBottom: "30px" }}>
-        <input
-          type="text"
-          value={newTaskText}
-          onChange={(e) => setNewTaskText(e.target.value)}
-          placeholder="Thêm một việc mới..."
-          style={{
-            flexGrow: 1,
-            padding: "12px 15px",
-            border: "2px solid #bdc3c7",
-            borderRadius: "6px 0 0 6px",
-            fontSize: "1rem",
-            outline: "none", // Bỏ outline khi focus
-          }}
-        />
-        <button
-          type="submit"
-          style={{
-            padding: "12px 25px",
-            backgroundColor: "#3498db",
-            color: "white",
-            border: "2px solid #3498db",
-            borderRadius: "0 6px 6px 0",
-            cursor: "pointer",
-            fontSize: "1rem",
-            fontWeight: "600",
-            transition: "background-color 0.2s ease",
-          }}
-          onMouseOver={(e) =>
-            (e.currentTarget.style.backgroundColor = "#2980b9")
-          }
-          onMouseOut={(e) =>
-            (e.currentTarget.style.backgroundColor = "#3498db")
-          }>
-          Thêm
-        </button>
-      </form>
-      {error && (
-        <p
-          style={{
-            color: "#e74c3c",
-            textAlign: "center",
-            marginBottom: "20px",
-            fontWeight: "500",
-          }}>
-          {error}
-        </p>
-      )}
-      {tasks.length === 0 && !isLoading && !error && (
-        <p
-          style={{
-            textAlign: "center",
-            color: "#7f8c8d",
-            fontSize: "1.1rem",
-            marginTop: "40px",
-            padding: "20px",
-            backgroundColor: "#ecf0f1",
-            borderRadius: "6px",
-          }}>
-          Tuyệt vời! Không có công việc nào cần làm. <br /> Hãy tận hưởng thời
-          gian rảnh hoặc thêm việc mới nhé!
-        </p>
-      )}
-      <ul style={{ listStyleType: "none", padding: 0 }}>
-        {tasks.map((task) => (
-          <li
-            key={task._id}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              padding: "15px",
-              borderBottom: "1px solid #ecf0f1",
-              backgroundColor: task.isCompleted ? "#f9f9f9" : "#fff",
-              transition: "background-color 0.3s ease",
-            }}>
-            <input
-              type="checkbox"
-              checked={task.isCompleted}
-              onChange={() => handleToggleComplete(task)} // Truyền cả object task
-              style={{
-                marginRight: "15px",
-                cursor: "pointer",
-                transform: "scale(1.3)", // Làm checkbox to hơn một chút
-                accentColor: "#2ecc71", // Màu của checkbox khi được chọn
-              }}
-            />
-            <span
-              style={{
-                textDecoration: task.isCompleted ? "line-through" : "none",
-                color: task.isCompleted ? "#95a5a6" : "#34495e",
-                fontSize: "1.1rem",
-                flexGrow: 1,
-                cursor: "pointer", // Thêm cursor pointer để người dùng biết có thể click
-              }}
-              onClick={() => handleToggleComplete(task)} // Cho phép click vào text để toggle
-            >
-              {task.text}
-            </span>
-            <button
-              onClick={() => handleDeleteTask(task._id)}
-              style={{
-                marginLeft: "15px",
-                backgroundColor: "transparent", // Nút xóa trong suốt hơn
-                color: "#e74c3c",
-                border: "1px solid #e74c3c",
-                padding: "6px 12px",
-                borderRadius: "4px",
-                cursor: "pointer",
-                fontSize: "0.9rem",
-                fontWeight: "500",
-                transition: "background-color 0.2s ease, color 0.2s ease",
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.backgroundColor = "#e74c3c";
-                e.currentTarget.style.color = "white";
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-                e.currentTarget.style.color = "#e74c3c";
-              }}>
-              Xóa
-            </button>
-          </li>
-        ))}
-      </ul>
+    <div className="min-h-screen flex justify-center p-4 sm:p-6 bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100">
+      <div className="w-full max-w-2xl bg-white rounded-xl shadow-2xl p-6 sm:p-8 space-y-6">
+        <PomodoroTimer />
+
+        <h1 className="text-3xl sm:text-4xl font-bold text-center text-gray-800 mt-4 mb-6">
+          Danh Sách Công Việc
+        </h1>
+
+        <form onSubmit={handleAddTask} className="flex gap-2 mb-6">
+          <input
+            type="text"
+            value={newTaskText}
+            onChange={(e) => setNewTaskText(e.target.value)}
+            placeholder="Thêm một việc mới..."
+            className="flex-grow px-4 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400
+                       focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500
+                       transition duration-200 ease-in-out text-base"
+          />
+          <button
+            type="submit"
+            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-md
+                       focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500
+                       transition duration-200 ease-in-out text-base disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isLoading}>
+            Thêm
+          </button>
+        </form>
+
+        {error && (
+          <p className="text-red-600 text-base font-medium italic text-center mb-4">
+            {error}
+          </p>
+        )}
+
+        {tasks && tasks.length === 0 && !isLoading && !error && (
+          <div className="text-center text-gray-600 text-lg italic p-6 bg-gray-50 rounded-lg shadow-inner">
+            Tuyệt vời! Không có công việc nào cần làm. <br /> Hãy tận hưởng thời
+            gian rảnh hoặc thêm việc mới nhé!
+          </div>
+        )}
+
+        {tasks && tasks.length > 0 && (
+          <ul className="space-y-3">
+            {tasks.map((task) => (
+              <li
+                key={task._id}
+                className={`flex items-center p-4 border border-gray-200 rounded-lg shadow-sm
+                           transition-all duration-300 ease-in-out
+                           ${
+                             task.isCompleted
+                               ? "bg-green-50 border-green-200"
+                               : "bg-white hover:shadow-md"
+                           }`}>
+                <input
+                  type="checkbox"
+                  checked={task.isCompleted}
+                  onChange={() => handleToggleComplete(task)}
+                  className="form-checkbox h-5 w-5 text-green-600 rounded border-gray-300 cursor-pointer focus:ring-green-500"
+                />
+                <span
+                  className={`flex-grow ml-4 text-lg cursor-pointer
+                             ${
+                               task.isCompleted
+                                 ? "line-through text-gray-500 italic"
+                                 : "text-gray-800"
+                             }`}
+                  onClick={() => handleToggleComplete(task)}>
+                  {task.text}
+                </span>
+                <button
+                  onClick={() => handleDeleteTask(task._id)}
+                  className="ml-4 px-3 py-1 text-sm font-medium text-red-600 border border-red-600 rounded-md
+                             hover:bg-red-600 hover:text-white transition duration-200 ease-in-out
+                             focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                  Xóa
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
