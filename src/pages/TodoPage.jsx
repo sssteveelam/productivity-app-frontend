@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import taskService from "../api/taskService";
+import PomodoroTimer from "../components/PomodoroTimer"; // Điều chỉnh đường dẫn nếu cần
 
 export default function TodoPage() {
   const navigate = useNavigate();
@@ -155,6 +156,7 @@ export default function TodoPage() {
         borderRadius: "10px",
         backgroundColor: "#fff",
       }}>
+      <PomodoroTimer />
       <h1
         style={{
           textAlign: "center",
@@ -164,7 +166,6 @@ export default function TodoPage() {
         }}>
         Công Việc Cần Làm
       </h1>
-
       <form
         onSubmit={handleAddTask}
         style={{ display: "flex", marginBottom: "30px" }}>
@@ -204,7 +205,6 @@ export default function TodoPage() {
           Thêm
         </button>
       </form>
-
       {error && (
         <p
           style={{
@@ -216,7 +216,6 @@ export default function TodoPage() {
           {error}
         </p>
       )}
-
       {tasks.length === 0 && !isLoading && !error && (
         <p
           style={{
@@ -232,7 +231,6 @@ export default function TodoPage() {
           gian rảnh hoặc thêm việc mới nhé!
         </p>
       )}
-
       <ul style={{ listStyleType: "none", padding: 0 }}>
         {tasks.map((task) => (
           <li
