@@ -12,56 +12,125 @@ function PomodoroTimer({ focusTaskName = null }) {
   const [isActive, setIsActive] = useState(false);
   const [mode, setMode] = useState("work"); // 'work', 'shortBreak', 'longBreak'
   const [pomodoroCount, setPomodoroCount] = useState(0);
+  const [notificationPermission, setNotificationPermission] =
+    useState("default");
 
   const intervalRef = useRef(null);
   const audioRef = useRef(null);
+
+  // Kiểm tra quyền thông báo khi component mount
+  useEffect(() => {
+    if ("Notification" in window) {
+      setNotificationPermission(Notification.permission);
+    } else {
+      console.warn("'Trình duyệt này không hỗ trợ thông báo trên desktop.'");
+      setNotificationPermission("unsupported"); // Hoặc 'denied' để đơn giản
+    }
+  }, []);
+
+  // Hàm yêu cầu quyền thông báo
+  const requestNotificationPermission = async () => {
+    if (!("Notification" in window)) {
+      alert("Trình duyệt này không hỗ trợ thông báo trên desktop.");
+      setNotificationPermission("unsupported");
+      return;
+    }
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      if (permission === "granted") {
+        new Notification("Thông báo Pomodoro đã được bật!", {
+          body: "Bạn sẽ nhận được thông báo khi hết mỗi phiên.",
+          icon: "/icons/pomodoro-icon.png",
+        });
+      } else if (permission === "denied") {
+        alert(
+          "Bạn đã từ chối nhận thông báo. Nếu muốn bật lại, hãy kiểm tra cài đặt thông báo của trình duyệt cho trang này."
+        );
+      }
+    } catch (error) {
+      // Xử lý cho các trình duyệt cũ hơn có thể dùng callback
+      Notification.requestPermission(function (permission) {
+        setNotificationPermission(permission);
+        if (permission === "granted") {
+          new Notification("Thông báo Pomodoro đã được bật!", {
+            body: "Bạn sẽ nhận được thông báo khi hết mỗi phiên.",
+            icon: "/icons/pomodoro-icon.png",
+          });
+        } else if (permission === "denied") {
+          alert(
+            "Bạn đã từ chối nhận thông báo. Nếu muốn bật lại, hãy kiểm tra cài đặt thông báo của trình duyệt cho trang này."
+          );
+        }
+      });
+      console.error("Lỗi khi yêu cầu quyền thông báo:", error);
+    }
+  };
+
+  // Hàm hiển thị thông báo desktop
+  const showDesktopNotification = (title, body) => {
+    if (notificationPermission === "granted") {
+      // Chỉ hiển thị nếu tab không active (người dùng đang ở tab/ứng dụng khác)
+      if (document.hidden) {
+        new Notification(title, {
+          body: body,
+          icon: "/icons/pomodoro-icon.png", // Đường dẫn tới icon trong thư mục public
+          tag: "pomodoro-cycle-notification", // tag giúp thông báo mới thay thế thông báo cũ có cùng tag
+        });
+      }
+    }
+  };
 
   const switchMode = () => {
     setIsActive(false);
     let nextMode = "";
     let nextMinutes = 0;
-    let alertMessage = "";
+    let notificationTitle = "";
+    let notificationBody = "";
     let newPomodoroCount = pomodoroCount;
 
-    // --- PHÁT ÂM THANH THÔNG BÁO ---
     if (audioRef.current) {
-      /* empty */
-      audioRef.current.play().catch((error) => {
-        console.warn("Lỗi khi phát âm thanh thông báo:", error);
-      });
+      audioRef.current
+        .play()
+        .catch((error) => console.warn("Lỗi khi phát âm thanh:", error));
     }
 
     if (mode === "work") {
       newPomodoroCount = pomodoroCount + 1;
       setPomodoroCount(newPomodoroCount);
-
-      if (newPomodoroCount % POMODOROS_PER_LONG_BREAK === 0) {
+      notificationTitle = "Hết Giờ Làm Việc!";
+      if (
+        newPomodoroCount > 0 &&
+        newPomodoroCount % POMODOROS_PER_LONG_BREAK === 0
+      ) {
         nextMode = "longBreak";
         nextMinutes = LONG_BREAK_DURATION_MINUTES;
-        alertMessage = `Tuyệt vời! Bạn đã hoàn thành ${POMODOROS_PER_LONG_BREAK} Pomodoro. Giờ là lúc nghỉ dài! 🥳`;
+        notificationBody = `Tuyệt vời! Đã hoàn thành ${POMODOROS_PER_LONG_BREAK} Pomodoro. Nghỉ dài thôi! 🥳`;
       } else {
         nextMode = "shortBreak";
         nextMinutes = SHORT_BREAK_DURATION_MINUTES;
-        alertMessage =
-          "Hết giờ làm việc rồi! Mình nghỉ ngắn chút nha bạn ơi! 🎉";
+        notificationBody = "Nghỉ ngắn chút nha bạn ơi! 🎉";
       }
     } else if (mode === "shortBreak") {
       nextMode = "work";
       nextMinutes = WORK_DURATION_MINUTES;
-      alertMessage =
-        "Hết giờ nghỉ ngắn! Năng lượng tràn trề, chiến đấu tiếp thôi nào! 💪";
+      notificationTitle = "Hết Giờ Nghỉ Ngắn!";
+      notificationBody = "Năng lượng tràn trề, chiến đấu tiếp thôi nào! 💪";
     } else {
+      // mode === "longBreak"
       nextMode = "work";
       nextMinutes = WORK_DURATION_MINUTES;
-      alertMessage =
-        "Hết giờ nghỉ dài! Sẵn sàng cho chu kỳ Pomodoro mới nhé! 🚀";
+      notificationTitle = "Hết Giờ Nghỉ Dài!";
+      notificationBody = "Sẵn sàng cho chu kỳ Pomodoro mới nhé! 🚀";
       setPomodoroCount(0);
     }
 
     setMode(nextMode);
     setMinutes(nextMinutes);
     setSeconds(0);
-    alert(alertMessage);
+
+    // Gọi hàm hiển thị thông báo desktop thay vì/hoặc cùng với alert
+    showDesktopNotification(notificationTitle, notificationBody);
   };
 
   useEffect(() => {
@@ -88,6 +157,9 @@ function PomodoroTimer({ focusTaskName = null }) {
     return () => clearInterval(intervalRef.current);
   }, [isActive]);
 
+  const displayTime = `${minutes.toString().padStart(2, "0")}:${seconds
+    .toString()
+    .padStart(2, "0")}`;
   const displayModeLabel =
     mode === "work"
       ? "Thời Gian Làm Việc"
@@ -112,7 +184,33 @@ function PomodoroTimer({ focusTaskName = null }) {
     } else {
       document.title = "Pomodoro Timer";
     }
-  }, [minutes, seconds, isActive, mode, switchMode, displayModeLabel]); // Added missing dependencies
+
+    let titlePrefix = "";
+    if (isActive) {
+      titlePrefix = `${displayModeLabel} -  ${displayTime} `;
+
+      if (mode === "work" && focusTaskName) {
+        titlePrefix += ` | ${focusTaskName}`;
+      }
+    } else {
+      if (minutes > 0 || seconds > 0) {
+        titlePrefix = `Sẵn sàng: ${displayModeLabel} - ${displayTime}`;
+      } else {
+        // eslint-disable-next-line no-unused-vars
+        titlePrefix = `Hoàn thành ${displayModeLabel}!`;
+      }
+    }
+
+    document.title = titlePrefix || "Pomodoro Timer";
+  }, [
+    minutes,
+    seconds,
+    isActive,
+    mode,
+    focusTaskName,
+    displayTime,
+    displayModeLabel,
+  ]);
 
   const handleStartPause = () => {
     setIsActive(!isActive);
@@ -126,10 +224,6 @@ function PomodoroTimer({ focusTaskName = null }) {
     setSeconds(0);
     setPomodoroCount(0);
   };
-
-  const displayTime = `${minutes.toString().padStart(2, "0")}:${seconds
-    .toString()
-    .padStart(2, "0")}`;
 
   const cardBorderColor =
     mode === "work"
@@ -164,6 +258,26 @@ function PomodoroTimer({ focusTaskName = null }) {
         src="/sounds/notification.mp3"
         preload="auto"
         style={{ display: "none" }}></audio>
+
+      {/* Nút yêu cầu quyền thông báo */}
+      {notificationPermission === "default" && (
+        <div className="mb-4 text-center">
+          <button
+            onClick={requestNotificationPermission}
+            className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-400 transition duration-150 ease-in-out">
+            Bật Thông Báo Desktop
+          </button>
+          <p className="text-xs text-slate-500 mt-1">
+            Để nhận thông báo khi hết mỗi phiên.
+          </p>
+        </div>
+      )}
+      {notificationPermission === "denied" && (
+        <p className="text-xs text-red-500 text-center mb-4">
+          Bạn đã tắt thông báo. Hãy vào cài đặt trình duyệt để bật lại.
+        </p>
+      )}
+
       <div
         className={`
           text-center p-6 sm:p-8
