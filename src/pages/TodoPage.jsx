@@ -10,6 +10,8 @@ export default function TodoPage() {
   const [newTaskText, setNewTaskText] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  // --- STATE - CÔNG VIỆC ĐANG TẬP TRUNG ---
+  const [currentFocusTask, setCurrentFocusTask] = useState(null); // Lưu trữ object task hoặc null
 
   const fetchTasks = async () => {
     setIsLoading(true);
@@ -90,6 +92,15 @@ export default function TodoPage() {
           task._id === taskToUpdate._id ? response.data : task
         )
       );
+
+      // Nếu task đang focus được đánh dấu hoàn thành, có thể bỏ focus nó đi
+      if (
+        currentFocusTask &&
+        currentFocusTask._id === taskToUpdate._id &&
+        response.data.isCompleted
+      ) {
+        setCurrentFocusTask(null);
+      }
     } catch (err) {
       console.error("Lỗi khi cập nhật trạng thái công việc:", err);
       setError("Không thể cập nhật trạng thái công việc. Vui lòng thử lại.");
@@ -114,6 +125,11 @@ export default function TodoPage() {
     try {
       await taskService.deleteTask(taskId);
       setTasks((prevTasks) => prevTasks.filter((task) => task._id !== taskId));
+
+      // Nếu task đang focus bị xóa, bỏ focus
+      if (currentFocusTask && currentFocusTask._id === taskId) {
+        setCurrentFocusTask(null);
+      }
     } catch (err) {
       console.error("Lỗi khi xóa công việc:", err);
       setError("Không thể xóa công việc. Vui lòng thử lại.");
@@ -127,6 +143,23 @@ export default function TodoPage() {
         navigate("/login");
       }
     }
+  };
+
+  // --- HÀM ĐẶT CÔNG VIỆC TẬP TRUNG ---
+  const handleSetFocusTask = (task) => {
+    if (task.isCompleted) {
+      alert(
+        "Công việc này đã hoàn thành, không thể đặt làm mục tiêu tập trung."
+      );
+      return;
+    }
+
+    setCurrentFocusTask(task);
+  };
+
+  // --- HÀM BỎ CHỌN CÔNG VIỆC TẬP TRUNG ---
+  const handleClearFocusTask = () => {
+    setCurrentFocusTask(null);
   };
 
   if (isLoading) {
@@ -159,31 +192,59 @@ export default function TodoPage() {
   return (
     <div className="min-h-screen flex justify-center p-4 sm:p-6 bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100">
       <div className="w-full max-w-2xl bg-white rounded-xl shadow-2xl p-6 sm:p-8 space-y-6">
-        <PomodoroTimer />
+        {/* Pomodoro Timer và thông tin task đang focus */}
+        <div className="w-full ">
+          {" "}
+          {/* Container cho Pomodoro và info focus task */}
+          <PomodoroTimer
+            focusTaskName={currentFocusTask ? currentFocusTask.text : null}
+          />
+          {currentFocusTask && (
+            <div className="mt-4 p-3 bg-indigo-100 border border-indigo-300 rounded-lg text-center shadow">
+              <p className="text-sm text-indigo-700">Đang tập trung vào:</p>
+              <p className="font-semibold text-indigo-800 text-lg">
+                {currentFocusTask.text}
+              </p>
+              <button
+                onClick={handleClearFocusTask}
+                className="mt-2 text-xs text-indigo-500 hover:text-indigo-700 underline">
+                Bỏ chọn
+              </button>
+            </div>
+          )}
+          {!currentFocusTask && (
+            <p className="mt-4 text-center text-gray-600 italic">
+              Chọn một công việc bên dưới để bắt đầu tập trung!
+            </p>
+          )}
+        </div>
 
-        <h1 className="text-3xl sm:text-4xl font-bold text-center text-gray-800 mt-4 mb-6">
-          Danh Sách Công Việc
-        </h1>
+        {/* Phần To-Do List */}
 
-        <form onSubmit={handleAddTask} className="flex gap-2 mb-6">
-          <input
-            type="text"
-            value={newTaskText}
-            onChange={(e) => setNewTaskText(e.target.value)}
-            placeholder="Thêm một việc mới..."
-            className="flex-grow px-4 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400
+        <div className="w-full max-w-2xl bg-white rounded-xl shadow-2xl p-6 sm:p-8 space-y-6">
+          <h1 className="text-3xl sm:text-4xl font-bold text-center text-gray-800 mb-6">
+            Danh Sách Công Việc
+          </h1>
+          <form onSubmit={handleAddTask} className="flex gap-2 mb-6">
+            <input
+              type="text"
+              value={newTaskText}
+              onChange={(e) => setNewTaskText(e.target.value)}
+              placeholder="Thêm một việc mới..."
+              className="flex-grow px-4 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400
                        focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500
                        transition duration-200 ease-in-out text-base"
-          />
-          <button
-            type="submit"
-            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-md
+            />
+            <button
+              type="submit"
+              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-md
                        focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500
                        transition duration-200 ease-in-out text-base disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isLoading}>
-            Thêm
-          </button>
-        </form>
+              disabled={isLoading}>
+              Thêm
+            </button>
+          </form>
+        </div>
 
         {error && (
           <p className="text-red-600 text-base font-medium italic text-center mb-4">
@@ -223,9 +284,30 @@ export default function TodoPage() {
                                  ? "line-through text-gray-500 italic"
                                  : "text-gray-800"
                              }`}
-                  onClick={() => handleToggleComplete(task)}>
+                  onClick={() => !task.isCompleted && handleSetFocusTask(task)} // Click vào text để focus nếu chưa hoàn thành
+                >
                   {task.text}
                 </span>
+
+                {/* Nút "Tập trung" */}
+                {!task.isCompleted &&
+                  (!currentFocusTask || currentFocusTask._id !== task._id) && (
+                    <button
+                      onClick={() => handleSetFocusTask(task)}
+                      className="ml-2 sm:ml-4 px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm font-medium text-indigo-600 border border-indigo-600 rounded-md
+                               hover:bg-indigo-600 hover:text-white transition duration-200 ease-in-out
+                               focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500">
+                      Tập trung
+                    </button>
+                  )}
+                {currentFocusTask &&
+                  currentFocusTask._id === task._id &&
+                  !task.isCompleted && (
+                    <span className="ml-2 sm:ml-4 px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm font-semibold text-white bg-indigo-500 rounded-md">
+                      Đang Focus
+                    </span>
+                  )}
+
                 <button
                   onClick={() => handleDeleteTask(task._id)}
                   className="ml-4 px-3 py-1 text-sm font-medium text-red-600 border border-red-600 rounded-md

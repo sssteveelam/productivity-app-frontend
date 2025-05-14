@@ -7,7 +7,7 @@ const SHORT_BREAK_DURATION_MINUTES = 5;
 const LONG_BREAK_DURATION_MINUTES = 15; // Đã bỏ comment
 const POMODOROS_PER_LONG_BREAK = 4; // Đã bỏ comment: Số phiên Pomodoro trước khi nghỉ dài
 
-function PomodoroTimer() {
+function PomodoroTimer({ focusTaskName = null }) {
   const [minutes, setMinutes] = useState(WORK_DURATION_MINUTES);
   const [seconds, setSeconds] = useState(0);
   const [isActive, setIsActive] = useState(false);
@@ -175,7 +175,15 @@ function PomodoroTimer() {
           `}>
           {displayModeLabel}
         </h2>
-
+        {/* HIỂN THỊ TASK ĐANG FOCUS */}
+        {mode === "work" && focusTaskName && (
+          <p className="text-sm text-slate-600 mb-3 font-medium italic">
+            Đang tập trung:{" "}
+            <span className="font-semibold not-italic text-slate-700">
+              {focusTaskName}
+            </span>
+          </p>
+        )}
         <div
           className={`
             text-[clamp(3.5rem,18vw,6rem)] 
