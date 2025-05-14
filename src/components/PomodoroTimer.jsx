@@ -1,37 +1,44 @@
-// src/components/PomodoroTimer.jsx
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect, useRef } from "react";
 
-// Thời gian mặc định cho các phiên (tính bằng phút)
-const WORK_DURATION_MINUTES = 25;
+const WORK_DURATION_MINUTES = 1;
 const SHORT_BREAK_DURATION_MINUTES = 5;
-const LONG_BREAK_DURATION_MINUTES = 15; // Đã bỏ comment
-const POMODOROS_PER_LONG_BREAK = 4; // Đã bỏ comment: Số phiên Pomodoro trước khi nghỉ dài
+const LONG_BREAK_DURATION_MINUTES = 15;
+const POMODOROS_PER_LONG_BREAK = 4;
 
 function PomodoroTimer({ focusTaskName = null }) {
   const [minutes, setMinutes] = useState(WORK_DURATION_MINUTES);
   const [seconds, setSeconds] = useState(0);
   const [isActive, setIsActive] = useState(false);
   const [mode, setMode] = useState("work"); // 'work', 'shortBreak', 'longBreak'
-  const [pomodoroCount, setPomodoroCount] = useState(0); // Đã bỏ comment: Đếm số Pomodoro đã hoàn thành trong chu kỳ hiện tại
+  const [pomodoroCount, setPomodoroCount] = useState(0);
 
   const intervalRef = useRef(null);
+  const audioRef = useRef(null);
 
   const switchMode = () => {
     setIsActive(false);
     let nextMode = "";
     let nextMinutes = 0;
     let alertMessage = "";
-    let newPomodoroCount = pomodoroCount; // Giữ nguyên count nếu không phải là kết thúc phiên work
+    let newPomodoroCount = pomodoroCount;
+
+    // --- PHÁT ÂM THANH THÔNG BÁO ---
+    if (audioRef.current) {
+      /* empty */
+      audioRef.current.play().catch((error) => {
+        console.warn("Lỗi khi phát âm thanh thông báo:", error);
+      });
+    }
 
     if (mode === "work") {
-      newPomodoroCount = pomodoroCount + 1; // Tăng số Pomodoro đã hoàn thành
-      setPomodoroCount(newPomodoroCount); // Cập nhật state
+      newPomodoroCount = pomodoroCount + 1;
+      setPomodoroCount(newPomodoroCount);
 
       if (newPomodoroCount % POMODOROS_PER_LONG_BREAK === 0) {
         nextMode = "longBreak";
         nextMinutes = LONG_BREAK_DURATION_MINUTES;
         alertMessage = `Tuyệt vời! Bạn đã hoàn thành ${POMODOROS_PER_LONG_BREAK} Pomodoro. Giờ là lúc nghỉ dài! 🥳`;
-        // Không reset pomodoroCount ở đây, sẽ reset khi long break kết thúc
       } else {
         nextMode = "shortBreak";
         nextMinutes = SHORT_BREAK_DURATION_MINUTES;
@@ -44,18 +51,17 @@ function PomodoroTimer({ focusTaskName = null }) {
       alertMessage =
         "Hết giờ nghỉ ngắn! Năng lượng tràn trề, chiến đấu tiếp thôi nào! 💪";
     } else {
-      // mode === "longBreak"
       nextMode = "work";
       nextMinutes = WORK_DURATION_MINUTES;
       alertMessage =
         "Hết giờ nghỉ dài! Sẵn sàng cho chu kỳ Pomodoro mới nhé! 🚀";
-      setPomodoroCount(0); // Reset pomodoroCount khi kết thúc nghỉ dài, bắt đầu chu kỳ mới
+      setPomodoroCount(0);
     }
 
     setMode(nextMode);
     setMinutes(nextMinutes);
     setSeconds(0);
-    alert(alertMessage); // Hiển thị thông báo
+    alert(alertMessage);
   };
 
   useEffect(() => {
@@ -82,11 +88,17 @@ function PomodoroTimer({ focusTaskName = null }) {
     return () => clearInterval(intervalRef.current);
   }, [isActive]);
 
+  const displayModeLabel =
+    mode === "work"
+      ? "Thời Gian Làm Việc"
+      : mode === "shortBreak"
+      ? "Thời Gian Nghỉ Ngắn"
+      : "Thời Gian Nghỉ Dài";
+
   useEffect(() => {
     if (isActive && minutes === 0 && seconds === 0) {
       switchMode();
     }
-    // Cập nhật tiêu đề trang với thời gian còn lại và chế độ
     if (isActive) {
       document.title = `${displayModeLabel} - ${minutes
         .toString()
@@ -98,10 +110,9 @@ function PomodoroTimer({ focusTaskName = null }) {
     ) {
       document.title = "Sẵn sàng làm việc!";
     } else {
-      document.title = "Pomodoro Timer"; // Tiêu đề mặc định
+      document.title = "Pomodoro Timer";
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [minutes, seconds, isActive, mode]); // Thêm displayModeLabel để cập nhật title nếu tên mode thay đổi
+  }, [minutes, seconds, isActive, mode, switchMode, displayModeLabel]); // Added missing dependencies
 
   const handleStartPause = () => {
     setIsActive(!isActive);
@@ -113,26 +124,19 @@ function PomodoroTimer({ focusTaskName = null }) {
     setMode("work");
     setMinutes(WORK_DURATION_MINUTES);
     setSeconds(0);
-    setPomodoroCount(0); // Reset cả số Pomodoro khi nhấn nút Reset
+    setPomodoroCount(0);
   };
 
   const displayTime = `${minutes.toString().padStart(2, "0")}:${seconds
     .toString()
     .padStart(2, "0")}`;
 
-  let displayModeLabel = "Thời Gian Làm Việc";
-  if (mode === "shortBreak") {
-    displayModeLabel = "Thời Gian Nghỉ Ngắn";
-  } else if (mode === "longBreak") {
-    displayModeLabel = "Thời Gian Nghỉ Dài";
-  }
-
   const cardBorderColor =
     mode === "work"
       ? "border-sky-500"
       : mode === "shortBreak"
       ? "border-emerald-500"
-      : "border-amber-500"; // Màu vàng cam cho nghỉ dài
+      : "border-amber-500";
 
   const headingTextColor =
     mode === "work"
@@ -142,24 +146,30 @@ function PomodoroTimer({ focusTaskName = null }) {
       : "text-amber-600";
 
   const startPauseButtonColor = isActive
-    ? "bg-orange-500 hover:bg-orange-600 focus:ring-orange-400" // Màu cam đậm hơn khi đang Pause
+    ? "bg-orange-500 hover:bg-orange-600 focus:ring-orange-400"
     : mode === "work"
     ? "bg-sky-500 hover:bg-sky-600 focus:ring-sky-400"
     : mode === "shortBreak"
     ? "bg-emerald-500 hover:bg-emerald-600 focus:ring-emerald-400"
-    : "bg-amber-500 hover:bg-amber-600 focus:ring-amber-400"; // Màu nút Start cho nghỉ dài
+    : "bg-amber-500 hover:bg-amber-600 focus:ring-amber-400";
 
   const baseButtonClass =
     "py-3 px-6 text-lg font-semibold text-white rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-150 ease-in-out active:transform active:scale-95 min-w-[140px] w-full sm:w-auto";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 to-sky-100 flex flex-col items-center justify-center p-4 font-sans selection:bg-sky-300 selection:text-sky-900">
+    <div className="bg-white rounded-xl shadow-xl p-6 sm:p-8 space-y-6 text-center">
+      {/* THÊM THẺ AUDIO Ở ĐÂY */}
+      <audio
+        ref={audioRef}
+        src="/sounds/notification.mp3"
+        preload="auto"
+        style={{ display: "none" }}></audio>
       <div
         className={`
           text-center p-6 sm:p-8
           border-4 ${cardBorderColor}
           rounded-2xl
-          max-w-md w-full
+          max-w-sm w-full
           mx-auto
           bg-white/90 backdrop-blur-sm
           shadow-2xl
@@ -175,7 +185,6 @@ function PomodoroTimer({ focusTaskName = null }) {
           `}>
           {displayModeLabel}
         </h2>
-        {/* HIỂN THỊ TASK ĐANG FOCUS */}
         {mode === "work" && focusTaskName && (
           <p className="text-sm text-slate-600 mb-3 font-medium italic">
             Đang tập trung:{" "}
@@ -186,14 +195,14 @@ function PomodoroTimer({ focusTaskName = null }) {
         )}
         <div
           className={`
-            text-[clamp(3.5rem,18vw,6rem)] 
-            font-mono font-extrabold 
+            text-[clamp(3.5rem,18vw,6rem)]
+            font-mono font-extrabold
             text-slate-800
             my-6 sm:my-8
-            py-4 
-            bg-slate-100/80 
+            py-4
+            bg-slate-100/80
             rounded-lg
-            shadow-inner 
+            shadow-inner
           `}>
           {displayTime}
         </div>
@@ -204,7 +213,7 @@ function PomodoroTimer({ focusTaskName = null }) {
             className={`
               ${baseButtonClass}
               ${startPauseButtonColor}
-              focus:ring-opacity-75 
+              focus:ring-opacity-75
             `}>
             {isActive ? "Tạm Dừng" : "Bắt Đầu"}
           </button>
@@ -219,7 +228,6 @@ function PomodoroTimer({ focusTaskName = null }) {
           </button>
         </div>
 
-        {/* Hiển thị số Pomodoro đã hoàn thành */}
         <div className="mt-6 sm:mt-8 text-center">
           <p className="text-slate-600 text-base">
             Đã hoàn thành:{" "}
@@ -228,13 +236,6 @@ function PomodoroTimer({ focusTaskName = null }) {
           </p>
         </div>
       </div>
-
-      <footer className="text-center mt-8">
-        <p className="text-sm text-slate-500">
-          💡 Mẹo nhỏ: Tập trung cao độ trong phiên làm việc nhé! Cố lên, bạn làm
-          được mà! 🚀
-        </p>
-      </footer>
     </div>
   );
 }
