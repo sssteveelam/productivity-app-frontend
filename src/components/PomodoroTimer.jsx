@@ -1,12 +1,23 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 
 const WORK_DURATION_MINUTES = 1;
 const SHORT_BREAK_DURATION_MINUTES = 5;
 const LONG_BREAK_DURATION_MINUTES = 15;
 const POMODOROS_PER_LONG_BREAK = 4;
 
+// Giá trị cài đặt mặc định ban đầu
+const initialSettings = {
+  work: 25,
+  shortBreak: 5,
+  longBreak: 15,
+  pomodorosPerLongBreak: 4,
+};
+
 function PomodoroTimer({ focusTaskName = null }) {
+  // State cho cài đặt, khởi tạo với giá trị mặc định
+  const [settings, setSettings] = useState(initialSettings);
+
   const [minutes, setMinutes] = useState(WORK_DURATION_MINUTES);
   const [seconds, setSeconds] = useState(0);
   const [isActive, setIsActive] = useState(false);
@@ -17,6 +28,52 @@ function PomodoroTimer({ focusTaskName = null }) {
 
   const intervalRef = useRef(null);
   const audioRef = useRef(null);
+  const NOTIFICATION_ICON_PATH = "/icons/pomodoro-icon.png";
+
+  // --- QUẢN LÝ CÀI ĐẶT ---
+  // 1. Tải cài đặt từ localStorage khi component mount
+  useEffect(() => {
+    const savedSettings = localStorage.getItem("pomodoroSettings");
+    if (savedSettings) {
+      const loadedSettings = JSON.parse(savedSettings);
+      setSettings(loadedSettings);
+      // Nếu timer không chạy, cập nhật thời gian theo cài đặt đã tải và mode hiện tại (thường là 'work')
+
+      if (!isActive) {
+        if (mode === "work") setMinutes(loadedSettings.work);
+        else if (mode === "shortBreak") setMinutes(loadedSettings.shortBreak);
+        else if (mode === "longBreak") setMinutes(loadedSettings.longBreak);
+        setSeconds(0);
+      }
+    } else {
+      // Nếu không có gì trong localStorage, đảm bảo timer bắt đầu với initialSettings.work
+
+      if (!isActive && mode === "work") {
+        setMinutes(initialSettings.work);
+        setSeconds(0);
+      }
+    } // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Lưu cài đặt vào localStorage mỗi khi state `settings` thay đổi
+  useEffect(() => {
+    localStorage.setItem("pomodoroSettings", JSON.stringify(settings));
+  }, [settings]);
+
+  // 3. Cập nhật thời gian hiển thị khi settings hoặc mode thay đổi (và timer không chạy)
+  //    Điều này hữu ích khi người dùng thay đổi giá trị trong input settings.
+  useEffect(() => {
+    if (!isActive) {
+      if (mode === "work") {
+        setMinutes(settings.work);
+      } else if (mode === "shortBreak") {
+        setMinutes(settings.shortBreak);
+      } else if (mode === "longBreak") {
+        setMinutes(settings.longBreak);
+      }
+      setSeconds(0);
+    }
+  }, [settings, mode]);
 
   // Kiểm tra quyền thông báo khi component mount
   useEffect(() => {
@@ -81,7 +138,8 @@ function PomodoroTimer({ focusTaskName = null }) {
     }
   };
 
-  const switchMode = () => {
+  // --- LOGIC TIMER ---
+  const switchMode = useCallback(() => {
     setIsActive(false);
     let nextMode = "";
     let nextMinutes = 0;
@@ -89,49 +147,48 @@ function PomodoroTimer({ focusTaskName = null }) {
     let notificationBody = "";
     let newPomodoroCount = pomodoroCount;
 
-    if (audioRef.current) {
+    if (audioRef.current)
       audioRef.current
         .play()
-        .catch((error) => console.warn("Lỗi khi phát âm thanh:", error));
-    }
+        .catch((e) => console.warn("Audio play failed", e));
 
     if (mode === "work") {
       newPomodoroCount = pomodoroCount + 1;
-      setPomodoroCount(newPomodoroCount);
-      notificationTitle = "Hết Giờ Làm Việc!";
       if (
         newPomodoroCount > 0 &&
-        newPomodoroCount % POMODOROS_PER_LONG_BREAK === 0
+        newPomodoroCount % settings.pomodorosPerLongBreak === 0
       ) {
         nextMode = "longBreak";
-        nextMinutes = LONG_BREAK_DURATION_MINUTES;
-        notificationBody = `Tuyệt vời! Đã hoàn thành ${POMODOROS_PER_LONG_BREAK} Pomodoro. Nghỉ dài thôi! 🥳`;
+        nextMinutes = settings.longBreak;
+        notificationTitle = "Hết Giờ Làm Việc!";
+        notificationBody = `Tuyệt vời! Đã hoàn thành ${settings.pomodorosPerLongBreak} Pomodoro. Nghỉ dài thôi! 🥳`;
       } else {
         nextMode = "shortBreak";
-        nextMinutes = SHORT_BREAK_DURATION_MINUTES;
+        nextMinutes = settings.shortBreak;
+        notificationTitle = "Hết Giờ Làm Việc!";
         notificationBody = "Nghỉ ngắn chút nha bạn ơi! 🎉";
       }
     } else if (mode === "shortBreak") {
       nextMode = "work";
-      nextMinutes = WORK_DURATION_MINUTES;
+      nextMinutes = settings.work;
       notificationTitle = "Hết Giờ Nghỉ Ngắn!";
       notificationBody = "Năng lượng tràn trề, chiến đấu tiếp thôi nào! 💪";
     } else {
       // mode === "longBreak"
       nextMode = "work";
-      nextMinutes = WORK_DURATION_MINUTES;
+      nextMinutes = settings.work;
       notificationTitle = "Hết Giờ Nghỉ Dài!";
       notificationBody = "Sẵn sàng cho chu kỳ Pomodoro mới nhé! 🚀";
-      setPomodoroCount(0);
+      newPomodoroCount = 0; // Reset pomodoroCount khi kết thúc nghỉ dài
     }
 
+    setPomodoroCount(newPomodoroCount); // Cập nhật pomodoroCount một lần ở đây
     setMode(nextMode);
     setMinutes(nextMinutes);
     setSeconds(0);
-
-    // Gọi hàm hiển thị thông báo desktop thay vì/hoặc cùng với alert
     showDesktopNotification(notificationTitle, notificationBody);
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, pomodoroCount, settings, showDesktopNotification]); // Thêm các dependency cần thiết
 
   useEffect(() => {
     if (isActive) {
@@ -202,15 +259,7 @@ function PomodoroTimer({ focusTaskName = null }) {
     }
 
     document.title = titlePrefix || "Pomodoro Timer";
-  }, [
-    minutes,
-    seconds,
-    isActive,
-    mode,
-    focusTaskName,
-    displayTime,
-    displayModeLabel,
-  ]);
+  }, [minutes, seconds, isActive, mode, focusTaskName, settings, switchMode]);
 
   const handleStartPause = () => {
     setIsActive(!isActive);
@@ -220,9 +269,26 @@ function PomodoroTimer({ focusTaskName = null }) {
     clearInterval(intervalRef.current);
     setIsActive(false);
     setMode("work");
-    setMinutes(WORK_DURATION_MINUTES);
+    setMinutes(settings.work);
     setSeconds(0);
     setPomodoroCount(0);
+  };
+
+  // --- HÀM XỬ LÝ THAY ĐỔI CÀI ĐẶT ---
+  const handleSettingsChange = (e) => {
+    const { name, value } = e.target;
+    let numValue = parseInt(value, 10);
+
+    // Validate input
+    if (isNaN(numValue) || numValue < 1) numValue = 1;
+    if (name === "pomodorosPerLongBreak" && numValue > 10)
+      numValue = 10; // Giới hạn pomodoros/cycle
+    else if (name !== "pomodorosPerLongBreak" && numValue > 180) numValue = 180; // Giới hạn thời gian 3 tiếng
+
+    setSettings((prevSettings) => ({
+      ...prevSettings,
+      [name]: numValue,
+    }));
   };
 
   const cardBorderColor =
@@ -346,8 +412,90 @@ function PomodoroTimer({ focusTaskName = null }) {
           <p className="text-slate-600 text-base">
             Đã hoàn thành:{" "}
             <span className="font-bold text-lg">{pomodoroCount}</span> /{" "}
-            {POMODOROS_PER_LONG_BREAK} Pomodoro
+            {settings.pomodorosPerLongBreak} Pomodoro
           </p>
+        </div>
+        {/* --- KHU VỰC CÀI ĐẶT --- */}
+        <div className="mt-8 p-6 bg-white/80 backdrop-blur-sm shadow-xl rounded-2xl max-w-md w-full text-slate-700">
+          <h3 className="text-xl font-semibold text-center mb-6 text-sky-700">
+            Tùy Chỉnh Pomodoro
+          </h3>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+            <div>
+              <label htmlFor="work" className="block text-sm font-medium mb-1">
+                Làm việc (phút):
+              </label>
+              <input
+                type="number"
+                name="work"
+                id="work"
+                value={settings.work}
+                onChange={handleSettingsChange}
+                min="1"
+                max="180"
+                className="w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="shortBreak"
+                className="block text-sm font-medium mb-1">
+                Nghỉ ngắn (phút):
+              </label>
+              <input
+                type="number"
+                name="shortBreak"
+                id="shortBreak"
+                value={settings.shortBreak}
+                onChange={handleSettingsChange}
+                min="1"
+                max="180"
+                className="w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="longBreak"
+                className="block text-sm font-medium mb-1">
+                Nghỉ dài (phút):
+              </label>
+              <input
+                type="number"
+                name="longBreak"
+                id="longBreak"
+                value={settings.longBreak}
+                onChange={handleSettingsChange}
+                min="1"
+                max="180"
+                className="w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-amber-500 focus:border-amber-500"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="pomodorosPerLongBreak"
+                className="block text-sm font-medium mb-1">
+                Pomodoros / Nghỉ dài:
+              </label>
+              <input
+                type="number"
+                name="pomodorosPerLongBreak"
+                id="pomodorosPerLongBreak"
+                value={settings.pomodorosPerLongBreak}
+                onChange={handleSettingsChange}
+                min="1"
+                max="10"
+                className="w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500"
+              />
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setSettings(initialSettings);
+              handleReset();
+            }} // Reset về mặc định và reset timer
+            className="mt-6 w-full py-2 px-4 bg-slate-500 hover:bg-slate-600 text-white font-semibold rounded-md shadow focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400 transition duration-150">
+            Đặt Lại Mặc Định
+          </button>
         </div>
       </div>
     </div>
