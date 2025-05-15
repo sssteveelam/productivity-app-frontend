@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import taskService from "../api/taskService";
 import PomodoroTimer from "../components/PomodoroTimer"; // Điều chỉnh đường dẫn nếu cần
@@ -12,6 +12,19 @@ export default function TodoPage() {
   const [error, setError] = useState(null);
   // --- STATE - CÔNG VIỆC ĐANG TẬP TRUNG ---
   const [currentFocusTask, setCurrentFocusTask] = useState(null); // Lưu trữ object task hoặc null
+
+  // --- STATE MỚI CHO CHỨC NĂNG SỬA ---
+  const [editingTaskId, setEditingTaskId] = useState(null);
+  const [editText, setEditText] = useState("");
+
+  const editInputRef = useRef(null);
+
+  useEffect(() => {
+    if (editingTaskId && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select(); // Chọn toàn bộ text để dễ dàng ghi đè
+    }
+  }, [editingTaskId]);
 
   const fetchTasks = async () => {
     setIsLoading(true);
@@ -162,6 +175,87 @@ export default function TodoPage() {
     setCurrentFocusTask(null);
   };
 
+  // --- CÁC HÀM CHO CHỨC NĂNG SỬA ---
+  const handleStartEdit = (task) => {
+    if (task.isCompleted) {
+      alert("Không thể sửa công việc đã hoàn thành.");
+      return;
+    }
+
+    setEditingTaskId(task._id);
+    setEditText(task.text);
+
+    // Nếu đang focus task khác, bỏ focus
+    if (currentFocusTask && currentFocusTask._id !== task._id) {
+      setCurrentFocusTask(null);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingTaskId(null);
+    setEditText("");
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingTaskId) return;
+
+    const trimmedEditText = editText.trim();
+
+    if (trimmedEditText === "") {
+      setError("Nội dung công việc không được để trống khi sửa.");
+      return;
+    }
+    setError(null);
+
+    // Tìm task gốc để so sánh, tránh gọi API nếu text không đổi
+    const originalTask = tasks.find((t) => t._id === editingTaskId);
+    if (originalTask && originalTask.text === trimmedEditText) {
+      handleCancelEdit(); // Text không đổi, chỉ cần thoát chế độ sửa
+      return;
+    }
+
+    try {
+      const response = await taskService.updateTask(editingTaskId, {
+        text: trimmedEditText,
+      });
+
+      setTasks((prevTasks) =>
+        prevTasks.map((task) =>
+          task._id === editingTaskId ? response.data : task
+        )
+      );
+
+      // Nếu task đang focus được sửa tên, cập nhật lại currentFocusTask
+      if (currentFocusTask && currentFocusTask._id === editingTaskId) {
+        setCurrentFocusTask(response.data);
+      }
+      // Thoát chế độ sửa sau khi lưu thành công
+      handleCancelEdit();
+    } catch (err) {
+      console.error("Lỗi khi lưu công việc:", err);
+      setError("Không thể lưu thay đổi. Vui lòng thử lại.");
+      if (
+        err.response &&
+        (err.response.status === 401 || err.response.status === 403)
+      ) {
+        setError(
+          "Phiên đăng nhập hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại."
+        );
+        navigate("/login");
+      }
+    }
+  };
+
+  const handleEditKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+
+      handleSaveEdit();
+    } else if (e.key === "Escape") {
+      handleCancelEdit();
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100">
@@ -259,62 +353,123 @@ export default function TodoPage() {
           </div>
         )}
 
-        {tasks && tasks.length > 0 && (
+        {tasks.length > 0 && (
           <ul className="space-y-3">
             {tasks.map((task) => (
               <li
                 key={task._id}
-                className={`flex items-center p-4 border border-gray-200 rounded-lg shadow-sm
-                           transition-all duration-300 ease-in-out
-                           ${
-                             task.isCompleted
-                               ? "bg-green-50 border-green-200"
-                               : "bg-white hover:shadow-md"
-                           }`}>
-                <input
-                  type="checkbox"
-                  checked={task.isCompleted}
-                  onChange={() => handleToggleComplete(task)}
-                  className="form-checkbox h-5 w-5 text-green-600 rounded border-gray-300 cursor-pointer focus:ring-green-500"
-                />
-                <span
-                  className={`flex-grow ml-4 text-lg cursor-pointer
-                             ${
-                               task.isCompleted
-                                 ? "line-through text-gray-500 italic"
-                                 : "text-gray-800"
-                             }`}
-                  onClick={() => !task.isCompleted && handleSetFocusTask(task)} // Click vào text để focus nếu chưa hoàn thành
-                >
-                  {task.text}
-                </span>
-
-                {/* Nút "Tập trung" */}
-                {!task.isCompleted &&
-                  (!currentFocusTask || currentFocusTask._id !== task._id) && (
+                className={`flex items-center p-3 sm:p-4 border rounded-lg shadow-sm
+                            transition-all duration-300 ease-in-out 
+                            ${
+                              task.isCompleted
+                                ? "bg-green-50 border-green-200 opacity-70"
+                                : currentFocusTask &&
+                                  currentFocusTask._id === task._id &&
+                                  editingTaskId !== task._id
+                                ? "bg-indigo-50 border-indigo-400 ring-2 ring-indigo-300"
+                                : editingTaskId === task._id
+                                ? "bg-yellow-50 border-yellow-300 ring-2 ring-yellow-200" // Highlight task đang sửa
+                                : "bg-white hover:shadow-lg border-gray-200"
+                            }`}>
+                {editingTaskId === task._id ? (
+                  // --- GIAO DIỆN KHI ĐANG SỬA ---
+                  <>
+                    <input
+                      ref={editInputRef} // Gắn ref vào đây
+                      type="text"
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      onKeyDown={handleEditKeyDown} // Xử lý Enter/Escape
+                      className="flex-grow px-3 py-2 border border-indigo-400 rounded-md shadow-sm 
+                                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base"
+                    />
                     <button
-                      onClick={() => handleSetFocusTask(task)}
-                      className="ml-2 sm:ml-4 px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm font-medium text-indigo-600 border border-indigo-600 rounded-md
-                               hover:bg-indigo-600 hover:text-white transition duration-200 ease-in-out
-                               focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500">
-                      Tập trung
+                      onClick={handleSaveEdit}
+                      className="ml-2 px-3 py-2 text-sm font-medium text-white bg-green-500 hover:bg-green-600 rounded-md shadow-sm">
+                      Lưu
                     </button>
-                  )}
-                {currentFocusTask &&
-                  currentFocusTask._id === task._id &&
-                  !task.isCompleted && (
-                    <span className="ml-2 sm:ml-4 px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm font-semibold text-white bg-indigo-500 rounded-md">
-                      Đang Focus
+                    <button
+                      onClick={handleCancelEdit}
+                      className="ml-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-md shadow-sm">
+                      Hủy
+                    </button>
+                  </>
+                ) : (
+                  // --- GIAO DIỆN XEM BÌNH THƯỜNG ---
+                  <>
+                    <input
+                      type="checkbox"
+                      checked={task.isCompleted}
+                      onChange={() => handleToggleComplete(task)}
+                      disabled={!!editingTaskId} // Vô hiệu hóa khi đang sửa task khác
+                      className="form-checkbox h-5 w-5 sm:h-6 sm:w-6 text-green-600 rounded border-gray-300 cursor-pointer focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                    <span
+                      className={`flex-grow ml-3 sm:ml-4 text-base sm:text-lg 
+                                  ${
+                                    task.isCompleted
+                                      ? "line-through text-gray-400 italic"
+                                      : currentFocusTask &&
+                                        currentFocusTask._id === task._id
+                                      ? "text-indigo-700 font-semibold cursor-pointer"
+                                      : "text-gray-800 cursor-pointer"
+                                  }`}
+                      onClick={() =>
+                        !task.isCompleted &&
+                        !editingTaskId &&
+                        handleSetFocusTask(task)
+                      } // Chỉ cho focus khi không sửa task khác
+                    >
+                      {task.text}
                     </span>
-                  )}
 
-                <button
-                  onClick={() => handleDeleteTask(task._id)}
-                  className="ml-4 px-3 py-1 text-sm font-medium text-red-600 border border-red-600 rounded-md
-                             hover:bg-red-600 hover:text-white transition duration-200 ease-in-out
-                             focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
-                  Xóa
-                </button>
+                    {!task.isCompleted && (
+                      <>
+                        {(!currentFocusTask ||
+                          currentFocusTask._id !== task._id) && (
+                          <button
+                            onClick={() => {
+                              if (editingTaskId) handleCancelEdit();
+                              handleSetFocusTask(task);
+                            }}
+                            disabled={
+                              !!editingTaskId && editingTaskId !== task._id
+                            } // Vô hiệu hóa khi đang sửa task khác
+                            className="ml-2 sm:ml-4 px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm font-medium text-indigo-600 border border-indigo-600 rounded-md
+                                       hover:bg-indigo-600 hover:text-white transition duration-200 ease-in-out
+                                       focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500
+                                       disabled:opacity-50 disabled:cursor-not-allowed">
+                            Tập trung
+                          </button>
+                        )}
+                        {currentFocusTask &&
+                          currentFocusTask._id === task._id && (
+                            <span className="ml-2 sm:ml-4 px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm font-semibold text-white bg-indigo-500 rounded-md">
+                              Đang Focus
+                            </span>
+                          )}
+                        <button
+                          onClick={() => handleStartEdit(task)}
+                          disabled={!!editingTaskId} // Vô hiệu hóa khi đang sửa task khác
+                          className="ml-2 px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm font-medium text-yellow-600 border border-yellow-600 rounded-md
+                                     hover:bg-yellow-600 hover:text-white transition duration-200 ease-in-out
+                                     focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-yellow-500
+                                     disabled:opacity-50 disabled:cursor-not-allowed">
+                          Sửa
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => handleDeleteTask(task._id)}
+                      disabled={!!editingTaskId && editingTaskId !== task._id} // Vô hiệu hóa khi đang sửa task khác
+                      className="ml-2 sm:ml-4 px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm font-medium text-red-600 border border-red-600 rounded-md
+                                 hover:bg-red-600 hover:text-white transition duration-200 ease-in-out
+                                 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500
+                                 disabled:opacity-50 disabled:cursor-not-allowed">
+                      Xóa
+                    </button>
+                  </>
+                )}
               </li>
             ))}
           </ul>
