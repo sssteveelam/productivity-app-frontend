@@ -1,5 +1,12 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import {
+  PlayIcon as PlaySolidIcon,
+  PauseIcon as PauseSolidIcon,
+  ArrowPathIcon,
+  ForwardIcon,
+  Cog6ToothIcon as SettingsSolidIcon,
+} from "@heroicons/react/20/solid";
 
 const WORK_DURATION_MINUTES = 1;
 const SHORT_BREAK_DURATION_MINUTES = 5;
@@ -25,6 +32,8 @@ function PomodoroTimer({ focusTaskName = null }) {
   const [pomodoroCount, setPomodoroCount] = useState(0);
   const [notificationPermission, setNotificationPermission] =
     useState("default");
+
+  const [elapsedSecondsInSession, setElapsedSecondsInSession] = useState(0);
 
   const intervalRef = useRef(null);
   const audioRef = useRef(null);
@@ -138,9 +147,40 @@ function PomodoroTimer({ focusTaskName = null }) {
     }
   };
 
+  useEffect(() => {
+    if (isActive) {
+      intervalRef.current = setInterval(() => {
+        setSeconds((prevSeconds) => {
+          if (prevSeconds > 0) {
+            setElapsedSecondsInSession((prev) => prev + 1); // Tăng thời gian đã trôi qua
+
+            return prevSeconds - 1;
+          } else {
+            setMinutes((prevMinutes) => {
+              if (prevMinutes > 0) {
+                setElapsedSecondsInSession((prev) => prev + 1); // Tăng thời gian đã trôi qua
+                return prevMinutes - 1;
+              } else {
+                // prevMinutes === 0 (và prevSeconds cũng là 0 trước đó)
+                // Hết giờ - logic chuyển mode sẽ xử lý ở useEffect khác
+
+                return 0;
+              }
+            });
+            return 59;
+          }
+        });
+      }, 1000);
+    } else {
+      clearInterval(intervalRef.current);
+    }
+    return () => clearInterval(intervalRef.current);
+  }, [isActive]);
+
   // --- LOGIC TIMER ---
   const switchMode = useCallback(() => {
     setIsActive(false);
+    setElapsedSecondsInSession(0); // Reset thời gian đã trôi qua khi chuyển mode
     let nextMode = "";
     let nextMinutes = 0;
     let notificationTitle = "";
@@ -190,30 +230,6 @@ function PomodoroTimer({ focusTaskName = null }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, pomodoroCount, settings, showDesktopNotification]); // Thêm các dependency cần thiết
 
-  useEffect(() => {
-    if (isActive) {
-      intervalRef.current = setInterval(() => {
-        setSeconds((prevSeconds) => {
-          if (prevSeconds > 0) {
-            return prevSeconds - 1;
-          } else {
-            setMinutes((prevMinutes) => {
-              if (prevMinutes > 0) {
-                return prevMinutes - 1;
-              } else {
-                return 0;
-              }
-            });
-            return 59;
-          }
-        });
-      }, 1000);
-    } else {
-      clearInterval(intervalRef.current);
-    }
-    return () => clearInterval(intervalRef.current);
-  }, [isActive]);
-
   const displayTime = `${minutes.toString().padStart(2, "0")}:${seconds
     .toString()
     .padStart(2, "0")}`;
@@ -262,6 +278,14 @@ function PomodoroTimer({ focusTaskName = null }) {
   }, [minutes, seconds, isActive, mode, focusTaskName, settings, switchMode]);
 
   const handleStartPause = () => {
+    if (!isActive && minutes === 0 && seconds === 0) {
+      if (mode === "work") setMinutes(settings.work);
+      else if (mode === "shortBreak") setMinutes(settings.shortBreak);
+      else if (mode === "longBreak") setMinutes(settings.longBreak);
+      setSeconds(0);
+      setElapsedSecondsInSession(0);
+    }
+
     setIsActive(!isActive);
   };
 
@@ -272,8 +296,28 @@ function PomodoroTimer({ focusTaskName = null }) {
     setMinutes(settings.work);
     setSeconds(0);
     setPomodoroCount(0);
+    setElapsedSecondsInSession(0);
   };
 
+  const handleSkipSession = () => {
+    // Đơn giản là gọi switchMode để chuyển sang phiên tiếp theo
+    // Nếu bạn muốn logic phức tạp hơn (ví dụ: chỉ skip khi đang làm việc), có thể thêm ở đây
+    switchMode();
+  };
+
+  // Thêm hàm xử lý cho nút "Settings" (hiện tại chỉ log ra console)
+  const handleOpenTimerSettings = () => {
+    console.log("Mở cài đặt Pomodoro Timer (sẽ làm sau)");
+    // Sau này sẽ gọi hàm để mở panel cài đặt cho riêng Pomodoro Timer
+    // hoặc mở phần cài đặt Focus Timer trong Panel Cài đặt lớn.
+  };
+
+  // Hàm định dạng thời gian cho "Current" (thời gian đã trôi qua)
+  const formatElapsedSessionTime = (totalSeconds) => {
+    const M = Math.floor(totalSeconds / 60);
+    const S = totalSeconds % 60;
+    return `${M.toString().padStart(2, "0")}:${S.toString().padStart(2, "0")}`;
+  };
   // --- HÀM XỬ LÝ THAY ĐỔI CÀI ĐẶT ---
   const handleSettingsChange = (e) => {
     const { name, value } = e.target;
@@ -291,37 +335,20 @@ function PomodoroTimer({ focusTaskName = null }) {
     }));
   };
 
+  // Cập nhật các biến màu để bao gồm cả class cho dark mode
   const cardBorderColor =
     mode === "work"
-      ? "border-sky-500"
+      ? "border-sky-500 dark:border-sky-400"
       : mode === "shortBreak"
-      ? "border-emerald-500"
-      : "border-amber-500";
-
-  const headingTextColor =
-    mode === "work"
-      ? "text-sky-600"
-      : mode === "shortBreak"
-      ? "text-emerald-600"
-      : "text-amber-600";
-
-  const startPauseButtonColor = isActive
-    ? "bg-orange-500 hover:bg-orange-600 focus:ring-orange-400"
-    : mode === "work"
-    ? "bg-sky-500 hover:bg-sky-600 focus:ring-sky-400"
-    : mode === "shortBreak"
-    ? "bg-emerald-500 hover:bg-emerald-600 focus:ring-emerald-400"
-    : "bg-amber-500 hover:bg-amber-600 focus:ring-amber-400";
-
-  const baseButtonClass =
-    "py-3 px-6 text-lg font-semibold text-white rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-150 ease-in-out active:transform active:scale-95 min-w-[140px] w-full sm:w-auto";
+      ? "border-emerald-500 dark:border-emerald-400"
+      : "border-amber-500 dark:border-amber-400";
 
   return (
-    <div className="bg-white rounded-xl shadow-xl p-6 sm:p-8 space-y-6 text-center">
-      {/* THÊM THẺ AUDIO Ở ĐÂY */}
+    // Container chính của Pomodoro Timer
+    <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl sm:p-8 text-center">
       <audio
         ref={audioRef}
-        src="/sounds/notification.mp3"
+        src="/sounds/notification.mp3" // Đảm bảo file này có trong thư mục public/sounds
         preload="auto"
         style={{ display: "none" }}></audio>
 
@@ -330,99 +357,139 @@ function PomodoroTimer({ focusTaskName = null }) {
         <div className="mb-4 text-center">
           <button
             onClick={requestNotificationPermission}
-            className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-400 transition duration-150 ease-in-out">
+            className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 dark:bg-yellow-400 dark:hover:bg-yellow-500 text-slate-800 dark:text-slate-900 font-semibold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-slate-900 focus:ring-yellow-400 dark:focus:ring-yellow-300 transition duration-150 ease-in-out">
             Bật Thông Báo Desktop
           </button>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Để nhận thông báo khi hết mỗi phiên.
           </p>
         </div>
       )}
       {notificationPermission === "denied" && (
-        <p className="text-xs text-red-500 text-center mb-4">
+        <p className="text-xs text-red-500 dark:text-red-400 text-center mb-4">
           Bạn đã tắt thông báo. Hãy vào cài đặt trình duyệt để bật lại.
         </p>
       )}
 
+      {/* Card hiển thị thời gian chính */}
       <div
         className={`
-          text-center p-6 sm:p-8
-          border-4 ${cardBorderColor}
-          rounded-2xl
-          max-w-sm w-full
-          mx-auto
-          bg-white/90 backdrop-blur-sm
-          shadow-2xl
+          text-center p-6 sm:p-8 
+          border-4 ${cardBorderColor} 
+          rounded-2xl 
+          max-w-sm w-full 
+          mx-auto 
+          bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm 
+          shadow-2xl dark:shadow-[0_10px_15px_-3px_rgba(0,0,0,0.3),0_4px_6px_-2px_rgba(0,0,0,0.2)]
           transition-colors duration-300 ease-in-out
         `}>
-        <h2
-          className={`
-            ${headingTextColor}
-            mb-4 sm:mb-6
-            text-2xl sm:text-3xl
-            font-bold tracking-tight
+        {/* Tiêu đề mode và Focus Task Name */}
+        <div className="mb-3 sm:mb-4">
+          {" "}
+          {/* Giảm margin bottom một chút */}
+          <h2
+            className={`
+            ${
+              mode === "work"
+                ? "text-pink-300 dark:text-pink-400"
+                : mode === "shortBreak"
+                ? "text-emerald-400 dark:text-emerald-500"
+                : "text-amber-400 dark:text-amber-500"
+            }
+            text-lg sm:text-xl font-semibold tracking-tight
             transition-colors duration-300 ease-in-out
           `}>
-          {displayModeLabel}
-        </h2>
-        {mode === "work" && focusTaskName && (
-          <p className="text-sm text-slate-600 mb-3 font-medium italic">
-            Đang tập trung:{" "}
-            <span className="font-semibold not-italic text-slate-700">
-              {focusTaskName}
-            </span>
-          </p>
-        )}
+            {displayModeLabel}
+          </h2>
+          {mode === "work" && focusTaskName && (
+            <p className="text-xs sm:text-sm text-white/70 dark:text-white/60 mt-1 italic">
+              Đang tập trung:{" "}
+              <span className="font-medium not-italic">{focusTaskName}</span>
+            </p>
+          )}
+        </div>
+
         <div
           className={`
-            text-[clamp(3.5rem,18vw,6rem)]
-            font-mono font-extrabold
-            text-slate-800
-            my-6 sm:my-8
-            py-4
-            bg-slate-100/80
-            rounded-lg
-            shadow-inner
+            text-[clamp(3.5rem,18vw,6rem)] 
+            font-mono font-extrabold 
+            text-slate-800 dark:text-slate-100
+            my-6 sm:my-8 
+            py-4  
+            bg-slate-100/80 dark:bg-slate-700/60
+            rounded-lg 
+            shadow-inner dark:shadow-[inset_0_2px_4px_0_rgba(0,0,0,0.2)]
           `}>
           {displayTime}
         </div>
 
+        {/* THÊM HIỂN THỊ THỜI GIAN ĐÃ TRÔI QUA (CURRENT) */}
+        <div className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mb-6 -mt-4 sm:-mt-6">
+          Current: {formatElapsedSessionTime(elapsedSecondsInSession)}
+        </div>
+
+        {/* Các nút điều khiển */}
         <div className="flex flex-col sm:flex-row justify-center items-center gap-4 sm:gap-5">
           <button
             onClick={handleStartPause}
-            className={`
-              ${baseButtonClass}
-              ${startPauseButtonColor}
-              focus:ring-opacity-75
-            `}>
-            {isActive ? "Tạm Dừng" : "Bắt Đầu"}
+            title={isActive ? "Tạm dừng" : "Bắt đầu"}
+            className="p-4 sm:p-5 bg-white/20 dark:bg-black/30 hover:bg-white/30 dark:hover:bg-black/40 rounded-full transition-colors duration-200 text-dark dark:text-white text-2xl sm:text-3xl font-semibold focus:outline-none focus:ring-2 focus:ring-pink-400 focus:ring-offset-2 dark:focus:ring-offset-transparent"
+            style={{ width: "80px", height: "80px", lineHeight: "normal" }} // Làm nút Start to hơn
+          >
+            {isActive ? (
+              <PauseSolidIcon className="w-8 h-8 sm:w-10 sm:h-10 " />
+            ) : (
+              <PlaySolidIcon className="w-8 h-8 sm:w-10 sm:h-10 " />
+            )}
           </button>
+
           <button
             onClick={handleReset}
-            className={`
-              ${baseButtonClass}
-              bg-slate-500 hover:bg-slate-600
-              focus:ring-slate-400 focus:ring-opacity-75
-            `}>
-            Reset
+            title="Reset"
+            className="p-3 sm:p-4 bg-white/10 dark:bg-black/20 hover:bg-white/20 dark:hover:bg-black/30 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-pink-400 focus:ring-offset-2 dark:focus:ring-offset-transparent">
+            <ArrowPathIcon className="w-5 h-5 sm:w-6 sm:h-6 text-dark dark:text-white" />
           </button>
+
+          <button
+            onClick={handleSkipSession}
+            title="Bỏ qua phiên"
+            className="p-3 sm:p-4 bg-white/10 dark:bg-black/20 hover:bg-white/20 dark:hover:bg-black/30 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-pink-400 focus:ring-offset-2 dark:focus:ring-offset-transparent">
+            <ForwardIcon className="w-5 h-5 sm:w-6 sm:h-6 text-dark dark:text-white" />
+          </button>
+
+          {/* Nút mở cài đặt Pomodoro (có thể đặt ở đây hoặc trên thanh công cụ chung) */}
+          {/* Hiện tại mình tạm ẩn đi, vì sẽ có icon Settings trên thanh công cụ chung */}
+          {/* <button 
+        onClick={handleOpenTimerSettings} 
+        title="Cài đặt Timer"
+        className="absolute top-4 right-4 p-2 bg-white/10 dark:bg-black/20 hover:bg-white/20 dark:hover:bg-black/30 rounded-full transition-colors"
+      >
+        <SettingsSolidIcon className="w-5 h-5 text-white" />
+      </button> */}
         </div>
 
+        {/* Hiển thị số Pomodoro đã hoàn thành */}
         <div className="mt-6 sm:mt-8 text-center">
-          <p className="text-slate-600 text-base">
+          <p className="text-slate-600 dark:text-slate-400 text-base">
             Đã hoàn thành:{" "}
-            <span className="font-bold text-lg">{pomodoroCount}</span> /{" "}
-            {settings.pomodorosPerLongBreak} Pomodoro
+            <span className="font-bold text-lg text-slate-700 dark:text-slate-300">
+              {pomodoroCount}
+            </span>{" "}
+            / {settings.pomodorosPerLongBreak} Pomodoro
           </p>
         </div>
-        {/* --- KHU VỰC CÀI ĐẶT --- */}
-        <div className="mt-8 p-6 bg-white/80 backdrop-blur-sm shadow-xl rounded-2xl max-w-md w-full text-slate-700">
-          <h3 className="text-xl font-semibold text-center mb-6 text-sky-700">
+
+        {/* Khu vực cài đặt */}
+        <div className="mt-8 p-6 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm shadow-xl dark:shadow-lg rounded-2xl max-w-md w-full text-slate-700 dark:text-slate-300">
+          <h3 className="text-xl font-semibold text-center mb-6 text-sky-700 dark:text-sky-500">
             Tùy Chỉnh Pomodoro
           </h3>
           <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+            {/* Input cho Work duration */}
             <div>
-              <label htmlFor="work" className="block text-sm font-medium mb-1">
+              <label
+                htmlFor="work"
+                className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">
                 Làm việc (phút):
               </label>
               <input
@@ -433,13 +500,14 @@ function PomodoroTimer({ focusTaskName = null }) {
                 onChange={handleSettingsChange}
                 min="1"
                 max="180"
-                className="w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500"
+                className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 dark:bg-slate-700 dark:text-white dark:placeholder-slate-400"
               />
             </div>
+            {/* Input cho Short Break */}
             <div>
               <label
                 htmlFor="shortBreak"
-                className="block text-sm font-medium mb-1">
+                className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">
                 Nghỉ ngắn (phút):
               </label>
               <input
@@ -450,13 +518,14 @@ function PomodoroTimer({ focusTaskName = null }) {
                 onChange={handleSettingsChange}
                 min="1"
                 max="180"
-                className="w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
+                className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 dark:bg-slate-700 dark:text-white dark:placeholder-slate-400"
               />
             </div>
+            {/* Input cho Long Break */}
             <div>
               <label
                 htmlFor="longBreak"
-                className="block text-sm font-medium mb-1">
+                className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">
                 Nghỉ dài (phút):
               </label>
               <input
@@ -467,13 +536,14 @@ function PomodoroTimer({ focusTaskName = null }) {
                 onChange={handleSettingsChange}
                 min="1"
                 max="180"
-                className="w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-amber-500 focus:border-amber-500"
+                className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:ring-amber-500 focus:border-amber-500 dark:bg-slate-700 dark:text-white dark:placeholder-slate-400"
               />
             </div>
+            {/* Input cho Pomodoros per Long Break */}
             <div>
               <label
                 htmlFor="pomodorosPerLongBreak"
-                className="block text-sm font-medium mb-1">
+                className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">
                 Pomodoros / Nghỉ dài:
               </label>
               <input
@@ -484,16 +554,29 @@ function PomodoroTimer({ focusTaskName = null }) {
                 onChange={handleSettingsChange}
                 min="1"
                 max="10"
-                className="w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500"
+                className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 dark:bg-slate-700 dark:text-white dark:placeholder-slate-400"
               />
             </div>
           </div>
           <button
             onClick={() => {
-              setSettings(initialSettings);
-              handleReset();
-            }} // Reset về mặc định và reset timer
-            className="mt-6 w-full py-2 px-4 bg-slate-500 hover:bg-slate-600 text-white font-semibold rounded-md shadow focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400 transition duration-150">
+              const defaultSettings = {
+                work: 25,
+                shortBreak: 5,
+                longBreak: 15,
+                pomodorosPerLongBreak: 4,
+              };
+              setSettings(defaultSettings); // Reset về giá trị mặc định trong code
+              // Sau khi setSettings, useEffect sẽ tự động cập nhật lại minutes, seconds và gọi handleReset nếu cần
+              // Hoặc gọi handleReset ngay tại đây để đảm bảo timer được reset theo giá trị mới ngay lập tức
+              clearInterval(intervalRef.current);
+              setIsActive(false);
+              setMode("work");
+              setMinutes(defaultSettings.work);
+              setSeconds(0);
+              setPomodoroCount(0);
+            }}
+            className="mt-6 w-full py-2 px-4 bg-slate-500 hover:bg-slate-600 dark:bg-slate-600 dark:hover:bg-slate-700 text-white font-semibold rounded-md shadow focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-slate-800 focus:ring-slate-400 dark:focus:ring-slate-500 transition duration-150">
             Đặt Lại Mặc Định
           </button>
         </div>
