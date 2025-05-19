@@ -5,8 +5,26 @@ import {
   PlayIcon,
   ArrowPathIcon as ResetIcon,
 } from "@heroicons/react/20/solid";
+import { motion } from "framer-motion"; // Import motion
 
 const LOCAL_STORAGE_KEY_AMBIENT = "ambientTimerState";
+
+// Định nghĩa variants cho animation
+const timerVariants = {
+  hidden: { opacity: 0, scale: 0.8, y: 20 }, // Trạng thái ban đầu: mờ, hơi nhỏ, hơi dịch xuống
+  visible: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: { duration: 0.4, ease: "easeOut" }, // Thời gian và kiểu animation vào
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.8,
+    y: 20,
+    transition: { duration: 0.3, ease: "easeIn" }, // Thời gian và kiểu animation ra
+  },
+};
 
 function AmbientTimer() {
   // Khởi tạo state với giá trị null ban đầu để biết khi nào localStorage đã được đọc
@@ -134,40 +152,55 @@ function AmbientTimer() {
 
   if (totalSecondsRun === null || isActive === null) {
     return (
-      <div
-        className="bg-black/60 dark:bg-slate-800/80 backdrop-blur-md text-white p-3 sm:p-4 rounded-xl shadow-2xl w-48 sm:w-56 flex items-center justify-center"
-        style={{ height: "105px" }}>
-        {" "}
-        {/* Đặt chiều cao cố định để không giật layout */}
-        <p className="text-slate-300">Loading...</p>
-      </div>
+      <motion.div // Có thể animate cả phần loading
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="bg-black/30 dark:bg-slate-900/50 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl w-56 sm:w-64 flex items-center justify-center fixed top-4 right-4 sm:top-6 sm:right-6 z-50" // Giữ vị trí cố định
+        style={{ height: "120px" }}>
+        <p className="text-slate-300 dark:text-slate-400 animate-pulse">
+          Loading Ambient...
+        </p>
+      </motion.div>
     );
   }
 
   return (
-    <div className="bg-black/60 dark:bg-slate-800/80 backdrop-blur-md text-white p-3 sm:p-4 rounded-xl shadow-2xl w-48 sm:w-56">
-      <div className="text-3xl sm:text-4xl font-mono font-bold text-center mb-2 sm:mb-3">
+    // Sử dụng motion.div cho card timer và áp dụng variants
+    <motion.div
+      variants={timerVariants}
+      initial="hidden" // Trạng thái ban đầu khi component sắp được mount
+      animate="visible" // Trạng thái khi component đã mount và hiển thị
+      exit="exit" // Trạng thái khi component sắp unmount
+      className="bg-black/40 dark:bg-slate-800/80 backdrop-blur-lg text-white p-4 sm:p-5 rounded-2xl shadow-2xl w-56 sm:w-64 transform hover:shadow-purple-500/40 dark:hover:shadow-purple-600/40 fixed top-4 right-4 sm:top-6 sm:right-6 z-50"
+      // Bỏ class 'transition-all duration-300' của Tailwind nếu Framer Motion đã xử lý
+    >
+      {/* Thời gian đếm tiến */}
+      <div className="text-4xl sm:text-5xl md:text-[3.8rem] font-mono font-bold text-center mb-2 sm:mb-3 text-white tracking-wider">
+        {/* Tăng kích thước font, màu trắng, tracking */}
         {formatDisplayTime(totalSecondsRun)}
       </div>
-      <div className="flex justify-around items-center mt-1">
+
+      {/* Các nút điều khiển */}
+      <div className="flex justify-evenly items-center mt-3 sm:mt-4">
         <button
           onClick={handleTogglePlayPause}
-          className="p-2 text-slate-100 hover:text-white hover:bg-white/20 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-white/50"
+          className="p-2.5 text-slate-100 hover:text-white bg-white/10 hover:bg-white/20 dark:bg-slate-700/50 dark:hover:bg-slate-600/70 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-400 dark:focus:ring-purple-500 focus:ring-opacity-75"
           title={isActive ? "Pause Session" : "Resume Session"}>
           {isActive ? (
-            <PauseIcon className="w-6 h-6" />
+            <PauseIcon className="w-6 h-6 sm:w-7 sm:h-7" />
           ) : (
-            <PlayIcon className="w-6 h-6" />
+            <PlayIcon className="w-6 h-6 sm:w-7 sm:h-7" />
           )}
         </button>
         <button
           onClick={handleReset}
-          className="p-2 text-slate-100 hover:text-white hover:bg-white/20 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-white/50"
+          className="p-2.5 text-slate-100 hover:text-white bg-white/10 hover:bg-white/20 dark:bg-slate-700/50 dark:hover:bg-slate-600/70 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-400 dark:focus:ring-purple-500 focus:ring-opacity-75"
           title="Reset Timer">
-          <ResetIcon className="w-6 h-6" />
+          <ResetIcon className="w-6 h-6 sm:w-7 sm:h-7" />
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 }
 

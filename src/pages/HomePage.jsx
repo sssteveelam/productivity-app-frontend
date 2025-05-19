@@ -3,6 +3,9 @@ import React, { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import mainLogo from "../../public/icons/mainLogo.png"; // Logo của bạn
 
+import MusicSidebar from "../components/MusicSidebar";
+import SoundEffectPopup from "../components/SoundEffectPopup";
+
 import {
   Cog6ToothIcon,
   SpeakerWaveIcon,
@@ -14,11 +17,15 @@ import {
   SparklesIcon, // Dùng cho nút chuyển sang Ambient
   ArrowRightOnRectangleIcon, // Icon cho nút Đăng xuất
   MoonIcon, // Icon cho Dark mode (ví dụ)
-  SunIcon, // Icon cho Light mode (ví dụ)
+  SunIcon, // Icon cho Light mode (ví dụ),
+  SpeakerWaveIcon as ToolbarSpeakerWaveIcon,
+  MusicalNoteIcon, // Cho Music
+  AdjustmentsHorizontalIcon, // Hoặc SpeakerWaveIcon khác cho Sound Effects
 } from "@heroicons/react/24/outline";
 // import PomodoroTimer from "../components/PomodoroTimer"; // Bạn có thể tích hợp PomodoroTimer ở đây nếu muốn
 import { ThemeContext } from "../context/ThemeContext"; // Giả sử bạn có context này để đổi theme
 import AmbientTimer from "../components/AmbientTimer";
+import { motion, AnimatePresence } from "framer-motion"; // THÊM DÒNG NÀY
 
 function HomePage() {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -31,6 +38,9 @@ function HomePage() {
   const [quoteLoading, setQuoteLoading] = useState(true);
   const [quoteError, setQuoteError] = useState(null);
   const [pageMode, setPageMode] = useState("pomodoro"); // 'pomodoro' hoặc 'ambient'
+  // --- STATE MỚI CHO SIDEBAR ÂM NHẠC VÀ POPUP HIỆU ÚNG ÂM THANH ---
+  const [isMusicSidebarOpen, setIsMusicSidebarOpen] = useState(false);
+  const [isSoundEffectPopupOpen, setIsSoundEffectPopupOpen] = useState(false);
 
   const navigate = useNavigate();
 
@@ -219,35 +229,50 @@ function HomePage() {
       {pageMode === "pomodoro" && (
         <main className="flex-grow flex flex-col items-center justify-center text-center w-full z-0 -mt-10 sm:-mt-16">
           {/* Lời chào */}
-          <p className="text-xl sm:text-2xl md:text-3xl font-medium text-slate-700 dark:text-slate-300 mb-3 sm:mb-4 md:mb-6 animate-fadeIn">
+          <p className="text-xl sm:text-2xl md:text-3xl font-medium text-slate-700 dark:text-slate-300  sm:mb-4 md:mb-6 animate-fadeIn">
             {greeting}
           </p>
 
           {/* Đồng hồ lớn HH:MM */}
           <div
-            className="text-[clamp(5rem,25vw,11rem)] sm:text-[clamp(6rem,30vw,15rem)] font-mono font-extrabold text-slate-800 dark:text-white cursor-default transition-opacity hover:opacity-90"
+            className="text-[clamp(5rem,25vw,4rem)] p-0 sm:text-[clamp(6rem,30vw,15rem)] font-mono font-extrabold text-slate-800 dark:text-white cursor-default transition-opacity hover:opacity-90"
             title="Thời gian hiện tại">
             {formatLargeDisplayTime(currentTime)}
           </div>
-
-          {/* TODO: NẾU BẠN CÓ POMODORO TIMER, CÓ THỂ ĐẶT Ở ĐÂY */}
-          {/* <div className="mt-8 w-full max-w-sm">
-            <PomodoroTimer />
-          </div> */}
         </main>
       )}
 
-      {/* Ambient Timer: Chỉ hiển thị ở Ambient Mode */}
-      {pageMode === "ambient" && (
-        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-          <AmbientTimer />
-        </div>
-      )}
+      {/* Ambient Timer với AnimatePresence */}
+      <AnimatePresence>
+        {pageMode === "ambient" && (
+          // motion.div ở đây sẽ được định nghĩa trong AmbientTimer.jsx
+          // Nhưng AnimatePresence cần bọc component sẽ unmount/mount
+          <AmbientTimer key="ambient-timer" />
+          // Thêm key để AnimatePresence hoạt động đúng khi có nhiều children có thể xuất hiện/biến mất
+        )}
+      </AnimatePresence>
 
       {/* Footer: Thanh công cụ */}
-      <footer className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-30 flex flex-col items-end space-y-3">
+      <footer className="fixed bottom-4 sm:bottom-6 w-full px-4 sm:px-6 z-40 flex justify-between items-end">
+        {/* CỤM NÚT MỚI Ở GÓC DƯỚI BÊN TRÁI (Music, Sound Effects) */}
+        <div className="flex items-center bg-black/40 dark:bg-slate-800/70 backdrop-blur-md rounded-full shadow-xl p-1.5 sm:p-2 space-x-1 sm:space-x-2">
+          <button
+            title="Mở Âm nhạc"
+            onClick={() => setIsMusicSidebarOpen(true)}
+            className="p-2 sm:p-2.5 text-white/80 hover:text-white hover:bg-white/10 dark:hover:bg-slate-700 rounded-full transition-colors">
+            <MusicalNoteIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+          </button>
+          <button
+            title="Mở Hiệu ứng Âm thanh"
+            onClick={() => setIsSoundEffectPopupOpen(true)}
+            className="p-2 sm:p-2.5 text-white/80 hover:text-white hover:bg-white/10 dark:hover:bg-slate-700 rounded-full transition-colors">
+            {/* Thay SpeakerWaveIcon bằng AdjustmentsHorizontalIcon nếu muốn khác biệt với icon trên thanh công cụ phải */}
+            <AdjustmentsHorizontalIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+          </button>
+        </div>
+
         {/* Nhóm nút chính và chuyển đổi mode */}
-        <div className="flex items-center bg-slate-700/60 dark:bg-slate-800/70 backdrop-blur-md rounded-full shadow-xl p-1.5 sm:p-2 space-x-1 sm:space-x-1.5">
+        <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 bg-black/40 dark:bg-slate-800/70 backdrop-blur-md rounded-full shadow-xl p-1.5 sm:p-2 space-x-1 sm:space-x-2">
           {utilityButtons.map((btn) => (
             <button
               key={btn.title}
@@ -312,6 +337,15 @@ function HomePage() {
           ))}
         </div>
       </footer>
+
+      <MusicSidebar
+        isOpen={isMusicSidebarOpen}
+        onClose={() => setIsMusicSidebarOpen(false)}
+      />
+      <SoundEffectPopup
+        isOpen={isSoundEffectPopupOpen}
+        onClose={() => setIsSoundEffectPopupOpen(false)}
+      />
     </div>
   );
 }
