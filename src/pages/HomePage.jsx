@@ -3,6 +3,7 @@ import React, { useContext, useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import mainLogo from "../../public/icons/mainLogo.png"; // Logo của bạn
 
+import MiniMusicPlayer from "../components/MiniMusicPlayer"; // THÊM IMPORT NÀY
 import MusicSidebar from "../components/MusicSidebar";
 import SoundEffectPopup from "../components/SoundEffectPopup";
 import PomodoroTimer from "../components/PomodoroTimer";
@@ -383,10 +384,21 @@ export default function HomePage() {
   };
 
   const handleLargeClockClick = () => setShowFullPomodoro(true);
-  const handleFocusInputChange = (e) => setFocusPromptInput(e.target.value);
-  const handleFocusSubmit = (e) => {
-    e.preventDefault();
-    if (!showFullPomodoro) setShowFullPomodoro(true);
+
+  // Hàm processAndPlayMusicUrl, handleSaveMusicToFavorites, etc. vẫn nằm ở HomePage
+  const handleOpenMusicSidebar = () => {
+    setIsMusicSidebarOpen(true);
+    // Không cần ẩn MiniPlayer ở đây, vì logic render sẽ xử lý
+  };
+
+  const handleCloseMusicSidebar = () => {
+    setIsMusicSidebarOpen(false);
+    // Khi đóng sidebar, nếu có nhạc đang phát, MiniPlayer sẽ tự động hiển thị (do logic render)
+  };
+
+  const closeMusicPlayerAndSidebar = () => {
+    setCurrentPlayer({ type: null, src: null, name: null }); // Dừng nhạc hoàn toàn
+    setIsMusicSidebarOpen(false); // Đóng cả sidebar nếu đang mở
   };
 
   const utilityButtons = [
@@ -544,35 +556,22 @@ export default function HomePage() {
 
       <footer className="fixed bottom-4 sm:bottom-6 w-full px-4 sm:px-6 z-40 flex justify-between items-end pointer-events-none">
         <div className="flex items-center bg-black/30 dark:bg-slate-800/60 backdrop-blur-md rounded-full shadow-xl p-1.5 sm:p-2 space-x-1 sm:space-x-2 pointer-events-auto">
-          {currentPlayer.type &&
-          currentPlayer.type !== "message" &&
-          currentPlayer.src ? (
-            <div className="flex items-center bg-purple-500/30 dark:bg-purple-600/50 rounded-full pl-2.5 pr-1 py-1 sm:pl-3 sm:pr-1.5 sm:py-1.5 space-x-1 sm:space-x-1.5 transition-all duration-300">
-              <button
-                onClick={() => setIsMusicSidebarOpen(true)}
-                className="flex items-center space-x-1.5 group">
-                <MusicalNoteIcon className="w-5 h-5 text-white/80 group-hover:text-white transition-colors flex-shrink-0" />
-                <span
-                  className="text-xs sm:text-sm text-white/90 truncate max-w-[50px] sm:max-w-[70px] font-medium cursor-pointer group-hover:underline"
-                  title={currentPlayer.name}>
-                  {currentPlayer.name || "Now Playing"}
-                </span>
-              </button>
-              <button
-                title="Close music player"
-                onClick={closeMusicPlayer}
-                className="p-1 text-white/70 hover:text-white rounded-full hover:bg-white/10 dark:hover:bg-black/20 transition-colors">
-                <CloseIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              </button>
-            </div>
-          ) : (
-            <button
-              title="Open Music"
-              onClick={() => setIsMusicSidebarOpen(true)}
-              className="p-2 sm:p-2.5 text-white/80 hover:text-white hover:bg-white/10 dark:hover:bg-slate-700 rounded-full transition-colors">
-              <MusicalNoteIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-            </button>
-          )}
+          {/* NÚT ÂM NHẠC (MUSIC) */}
+          {/* Nút này sẽ luôn mở sidebar, việc hiển thị tên nhạc/đóng sẽ do MiniPlayer hoặc nút trong sidebar đảm nhiệm */}
+          <button
+            title="Mở Âm nhạc"
+            onClick={handleOpenMusicSidebar} // Luôn mở sidebar
+            className={`p-2 sm:p-2.5 text-white/80 hover:text-white rounded-full transition-colors
+                        ${
+                          currentPlayer.type &&
+                          currentPlayer.type !== "message" &&
+                          currentPlayer.src
+                            ? "hover:bg-purple-500/30 dark:hover:bg-purple-600/50 bg-purple-500/20 dark:bg-purple-600/40" // Highlight nếu có nhạc đang chạy
+                            : "hover:bg-white/10 dark:hover:bg-slate-700"
+                        }`}>
+            <MusicalNoteIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+          </button>
+
           {activeAmbientSound ? (
             <div className="flex items-center bg-sky-500/30 dark:bg-sky-600/50 rounded-full pl-2.5 pr-1 py-1 sm:pl-3 sm:pr-1.5 sm:py-1.5 space-x-1 sm:space-x-1.5 transition-all duration-300">
               <button
@@ -667,10 +666,11 @@ export default function HomePage() {
         </div>
       </footer>
 
+      {/* Music Sidebar sẽ hiển thị trình phát đầy đủ BÊN TRONG nó */}
       <MusicSidebar
         isOpen={isMusicSidebarOpen}
-        onClose={() => setIsMusicSidebarOpen(false)}
-        currentPlayer={currentPlayer}
+        onClose={handleCloseMusicSidebar} // Dùng hàm đóng mới
+        currentPlayer={currentPlayer} // Truyền currentPlayer xuống
         favorites={musicFavorites}
         onLoadCustomUrl={processAndPlayMusicUrl}
         onSaveToFavorites={handleSaveMusicToFavorites}
@@ -680,7 +680,7 @@ export default function HomePage() {
         onRemoveFavorite={handleRemoveMusicFavorite}
         onLoadSpotifyDefault={handleLoadSpotifyDefault}
         isLoadingUrl={isLoadingMusicUrl}
-        onClosePlayer={closeMusicPlayer}
+        onClosePlayer={closeMusicPlayerAndSidebar} // Sidebar có thể gọi hàm này để đóng cả player và sidebar
       />
       <SoundEffectPopup
         isOpen={isSoundEffectPopupOpen}
@@ -689,48 +689,16 @@ export default function HomePage() {
         activeSound={activeAmbientSound}
         onToggleSound={handleToggleAmbientSound}
       />
+      {/* MINI MUSIC PLAYER: Hiển thị khi sidebar đóng VÀ có nhạc đang phát */}
       <AnimatePresence>
-        {currentPlayer.type &&
+        {!isMusicSidebarOpen &&
+          currentPlayer.type &&
           currentPlayer.type !== "message" &&
           currentPlayer.src && (
-            <motion.div
-              key="music-player-container"
-              initial={{ opacity: 0, y: 50, x: "-50%" }}
-              animate={{ opacity: 1, y: 0, x: "-50%" }}
-              exit={{ opacity: 0, y: 50, x: "-50%" }}
-              transition={{ duration: 0.3 }}
-              className="fixed bottom-[calc(3.5rem+1rem+0.5rem)] left-1/2  
-                       w-[300px] sm:w-[340px] z-30 
-                       bg-slate-800/90 dark:bg-black/80 backdrop-blur-lg rounded-t-xl shadow-2xl overflow-hidden"
-              // Chỉ bo góc trên rounded-t-xl
-            >
-              <div className="p-2 flex justify-between items-center bg-slate-700/70 dark:bg-black/50">
-                <p
-                  className="text-xs text-white/90 truncate ml-2 w-full font-semibold"
-                  title={currentPlayer.name}>
-                  {currentPlayer.name || "Music Player"}
-                </p>
-                <button
-                  onClick={closeMusicPlayer}
-                  className="p-1 text-white/80 hover:text-white rounded-full hover:bg-white/10 dark:hover:bg-black/20 transition-colors">
-                  <CloseIcon className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="aspect-video">
-                {(currentPlayer.type === "youtube" ||
-                  currentPlayer.type === "spotify") && (
-                  <iframe
-                    width="100%"
-                    height="100%"
-                    src={currentPlayer.src}
-                    title={currentPlayer.name || "Music Player"}
-                    frameBorder="0"
-                    allow="autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowFullScreen
-                    sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-presentation"></iframe>
-                )}
-              </div>
-            </motion.div>
+            <MiniMusicPlayer
+              playerInfo={currentPlayer}
+              onClose={closeMusicPlayerAndSidebar} // Nút X trên mini player sẽ đóng nhạc
+            />
           )}
       </AnimatePresence>
     </div>
