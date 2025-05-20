@@ -33,7 +33,7 @@ const overlayVariants = {
 const MusicSidebar = ({
   isOpen,
   onClose,
-  currentPlayer,
+  currentPlayer, // Nhận từ HomePage
   favorites = [],
   onLoadCustomUrl,
   onSaveToFavorites,
@@ -41,7 +41,7 @@ const MusicSidebar = ({
   onRemoveFavorite,
   onLoadSpotifyDefault,
   isLoadingUrl,
-  onClosePlayer,
+  onClosePlayer, // Nhận từ HomePage
 }) => {
   const [customPlaylistUrl, setCustomPlaylistUrl] = useState("");
 
@@ -120,29 +120,42 @@ const MusicSidebar = ({
             </div>
 
             <div className="flex-grow p-4 sm:p-5 overflow-y-auto space-y-6">
-              {/* Khu vực hiển thị thông tin player nhỏ trong sidebar */}
+              {/* KHU VỰC HIỂN THỊ TRÌNH PHÁT NHẠC KHI SIDEBAR MỞ */}
               {currentPlayer &&
                 currentPlayer.type &&
                 currentPlayer.type !== "message" &&
                 currentPlayer.src && (
-                  <section className="mb-4 p-3 bg-indigo-50 dark:bg-indigo-900/40 rounded-lg shadow-sm">
-                    <div className="flex justify-between items-center mb-1">
-                      <p className="text-xs text-indigo-700 dark:text-indigo-300 uppercase font-semibold">
-                        Now Playing
-                      </p>
-                      {/* Nút đóng player này sẽ gọi hàm onClosePlayer từ HomePage */}
+                  <section className="mb-6">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4
+                        className="text-md font-semibold text-[var(--color-text-primary)] dark:text-slate-200 truncate"
+                        title={currentPlayer.name}>
+                        Now Playing:{" "}
+                        <em className="font-normal opacity-80">
+                          {currentPlayer.name}
+                        </em>
+                      </h4>
                       <button
-                        onClick={onClosePlayer}
-                        className="p-0.5 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 rounded-full hover:bg-red-100 dark:hover:bg-red-900/30"
+                        onClick={onClosePlayer} // Nút X này sẽ gọi hàm từ HomePage để đóng player
+                        className="p-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 rounded-full hover:bg-red-100 dark:hover:bg-red-900/30"
                         title="Close Player">
                         <XMarkIcon className="w-4 h-4" />
                       </button>
                     </div>
-                    <p
-                      className="font-medium text-sm text-indigo-800 dark:text-indigo-200 truncate"
-                      title={currentPlayer.name}>
-                      {currentPlayer.name || "Music Player"}
-                    </p>
+                    <div className="aspect-video bg-black rounded-lg overflow-hidden shadow-lg">
+                      {(currentPlayer.type === "youtube" ||
+                        currentPlayer.type === "spotify") && (
+                        <iframe
+                          width="100%"
+                          height="100%"
+                          src={currentPlayer.src}
+                          title={currentPlayer.name || "Music Player"}
+                          frameBorder="0"
+                          allow="autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                          allowFullScreen
+                          sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-presentation"></iframe>
+                      )}
+                    </div>
                   </section>
                 )}
               {currentPlayer &&
