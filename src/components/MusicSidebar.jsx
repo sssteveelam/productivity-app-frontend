@@ -1,21 +1,48 @@
 // src/components/MusicSidebar.jsx
 import React, { useEffect, useState } from "react";
-import { XMarkIcon } from "@heroicons/react/24/solid";
-import { motion, AnimatePresence } from "framer-motion"; // Import motion và AnimatePresence
+import {
+  XMarkIcon,
+  HeartIcon as HeartOutlineIcon,
+  PlayCircleIcon,
+} from "@heroicons/react/24/outline";
+import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
+import { motion, AnimatePresence } from "framer-motion";
+
+const MAX_FAVORITES = 5;
 
 const sidebarVariants = {
-  hidden: { x: "-100%", opacity: 0 }, // Trạng thái ban đầu (ẩn bên trái)
-  visible: { x: 0, opacity: 1 }, // Trạng thái khi hiển thị
-  exit: { x: "-100%", opacity: 0 }, // Trạng thái khi đóng
+  hidden: { x: "-100%", opacity: 0.5 },
+  visible: {
+    x: 0,
+    opacity: 1,
+    transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
+  },
+  exit: {
+    x: "-100%",
+    opacity: 0,
+    transition: { duration: 0.25, ease: [0.4, 0, 0.2, 1] },
+  },
 };
 
 const overlayVariants = {
   hidden: { opacity: 0 },
-  visible: { opacity: 1 },
-  exit: { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.35, ease: "easeInOut" } },
+  exit: { opacity: 0, transition: { duration: 0.25, ease: "easeInOut" } },
 };
 
-const MusicSidebar = ({ isOpen, onClose }) => {
+const MusicSidebar = ({
+  isOpen,
+  onClose,
+  currentPlayer,
+  favorites = [],
+  onLoadCustomUrl,
+  onSaveToFavorites,
+  onLoadFavorite,
+  onRemoveFavorite,
+  onLoadSpotifyDefault,
+  isLoadingUrl,
+  onClosePlayer,
+}) => {
   const [customPlaylistUrl, setCustomPlaylistUrl] = useState("");
 
   useEffect(() => {
@@ -29,30 +56,33 @@ const MusicSidebar = ({ isOpen, onClose }) => {
     };
   }, [isOpen]);
 
-  const handleLoadCustomPlaylist = () => {
+  const handleLoadClicked = () => {
     if (customPlaylistUrl.trim() === "") {
-      alert("Vui lòng dán URL playlist vào.");
+      // Thông báo lỗi có thể được xử lý ở HomePage thông qua currentPlayer
+      onLoadCustomUrl("", null);
       return;
     }
-    alert(
-      `Đang tải playlist: ${customPlaylistUrl} (Chức năng này sẽ được phát triển sau)`
-    );
+    onLoadCustomUrl(customPlaylistUrl, null);
   };
 
-  const handleSaveToFavorites = () => {
-    if (customPlaylistUrl.trim() === "") {
-      alert("Vui lòng dán URL playlist trước khi lưu.");
+  const handleSaveClicked = () => {
+    const urlToConsiderForSave =
+      customPlaylistUrl.trim() ||
+      (currentPlayer?.type !== "message" && currentPlayer?.src
+        ? currentPlayer.originalUrl || currentPlayer.src
+        : "");
+    if (!urlToConsiderForSave) {
+      // Có thể hiển thị thông báo lỗi tinh tế hơn ở đây thay vì alert
+      // Ví dụ: set một state lỗi nội bộ cho sidebar
+      alert("Please load or enter a valid URL to save.");
       return;
     }
-    alert(
-      `Đã lưu playlist vào Favorites: ${customPlaylistUrl} (Chức năng này sẽ được phát triển sau)`
-    );
-    // TODO: Logic lưu vào localStorage hoặc backend (nếu có user)
+    onSaveToFavorites(urlToConsiderForSave); // HomePage sẽ tạo tên
   };
 
-  const handleLoadSpotifyPlayer = () => {
-    alert("Tải trình phát Spotify (Chức năng này sẽ được phát triển sau)");
-    // TODO: Logic nhúng Spotify Web Playback SDK hoặc iframe
+  const isUrlFavorite = (urlToCheck) => {
+    if (!urlToCheck || !favorites) return false;
+    return favorites.some((fav) => fav.originalUrl === urlToCheck);
   };
 
   return (
@@ -60,105 +90,205 @@ const MusicSidebar = ({ isOpen, onClose }) => {
       {isOpen && (
         <>
           <motion.div
-            key="music-sidebar-overlay" // Key cần thiết cho AnimatePresence
+            key="music-sidebar-overlay"
             variants={overlayVariants}
             initial="hidden"
             animate="visible"
             exit="exit"
-            transition={{ duration: 0.3, ease: "easeInOut" }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/30 dark:bg-black/50 backdrop-blur-sm z-40"
-            aria-hidden="true"
+            className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-md z-40"
           />
 
           <motion.aside
-            key="music-sidebar-content" // Key cần thiết
+            key="music-sidebar-content"
             variants={sidebarVariants}
             initial="hidden"
             animate="visible"
             exit="exit"
-            transition={{ duration: 0.3, ease: "easeInOut" }} // Điều chỉnh duration và ease theo ý muốn
-            className={`fixed top-0 left-0 w-72 sm:w-80 h-full bg-[var(--color-surface)] dark:bg-slate-800
-                       shadow-2xl z-50 flex flex-col`} // Bỏ các class transform và transition của Tailwind
-          >
-            {/* Header của Sidebar */}
-            <div className="flex justify-between items-center p-4 border-b border-[var(--color-border)] dark:border-slate-700">
-              <h2 className="text-xl font-semibold">Music</h2>
+            className={`fixed top-0 left-0 w-72 sm:w-80 md:w-[360px] h-full 
+                       bg-[var(--color-surface)] dark:bg-slate-800 
+                       shadow-2xl z-50 flex flex-col
+                       text-[var(--color-text-primary)] dark:text-slate-100`}>
+            <div className="flex justify-between items-center p-4 sm:p-5 border-b border-[var(--color-border)] dark:border-slate-700 flex-shrink-0">
+              <h2 className="text-xl sm:text-2xl font-semibold">Music</h2>
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-md text-[var(--color-text-secondary)] dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="p-1.5 rounded-full text-[var(--color-text-secondary)] dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 ring-inset focus:ring-indigo-500"
                 aria-label="Đóng sidebar âm nhạc">
                 <XMarkIcon className="w-6 h-6" />
               </button>
             </div>
 
-            {/* Nội dung chính của Sidebar */}
-            <div className="flex-grow p-4 sm:p-6 overflow-y-auto space-y-8">
+            <div className="flex-grow p-4 sm:p-5 overflow-y-auto space-y-6">
+              {/* Khu vực hiển thị thông tin player nhỏ trong sidebar */}
+              {currentPlayer &&
+                currentPlayer.type &&
+                currentPlayer.type !== "message" &&
+                currentPlayer.src && (
+                  <section className="mb-4 p-3 bg-indigo-50 dark:bg-indigo-900/40 rounded-lg shadow-sm">
+                    <div className="flex justify-between items-center mb-1">
+                      <p className="text-xs text-indigo-700 dark:text-indigo-300 uppercase font-semibold">
+                        Now Playing
+                      </p>
+                      {/* Nút đóng player này sẽ gọi hàm onClosePlayer từ HomePage */}
+                      <button
+                        onClick={onClosePlayer}
+                        className="p-0.5 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 rounded-full hover:bg-red-100 dark:hover:bg-red-900/30"
+                        title="Close Player">
+                        <XMarkIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <p
+                      className="font-medium text-sm text-indigo-800 dark:text-indigo-200 truncate"
+                      title={currentPlayer.name}>
+                      {currentPlayer.name || "Music Player"}
+                    </p>
+                  </section>
+                )}
+              {currentPlayer &&
+                currentPlayer.type === "message" &&
+                currentPlayer.name && (
+                  <p
+                    className={`p-3 rounded-md text-sm mb-4 ${
+                      currentPlayer.name.includes("không hỗ trợ") ||
+                      currentPlayer.name.includes("Vui lòng")
+                        ? "bg-red-100 dark:bg-red-800/30 text-red-700 dark:text-red-300"
+                        : "bg-blue-100 dark:bg-blue-800/30 text-blue-700 dark:text-blue-300"
+                    }`}>
+                    {currentPlayer.name}
+                  </p>
+                )}
+
               {/* Phần Custom Playlists */}
-              <section>
+              <section aria-labelledby="custom-playlists-heading">
                 <div className="flex items-center mb-2">
-                  <h3 className="text-lg font-semibold text-[var(--color-text-primary)] dark:text-slate-100">
+                  <h3
+                    id="custom-playlists-heading"
+                    className="text-lg font-semibold">
                     Custom Playlists
                   </h3>
-                  <span className="ml-2 px-2 py-0.5 text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-800/50 rounded-full">
+                  <span className="ml-2 px-2 py-0.5 text-xs font-bold text-purple-700 dark:text-purple-400 bg-purple-100 dark:bg-purple-500/30 rounded-full">
                     👑 PLUS
                   </span>
                 </div>
-                <p className="text-sm text-[var(--color-text-secondary)] dark:text-slate-400 mb-3">
-                  Add your favorite playlists from Spotify, YouTube, Apple
-                  Music, SoundCloud, or Amazon Music. Store up to 5 to
+                <p className="text-sm text-[var(--color-text-secondary)] dark:text-slate-400 mb-4">
+                  Add YouTube or Spotify URLs. Save up to {MAX_FAVORITES}{" "}
                   favorites.
                 </p>
-                <input
-                  type="text"
-                  value={customPlaylistUrl}
-                  onChange={(e) => setCustomPlaylistUrl(e.target.value)}
-                  placeholder="Paste playlist or video URL here"
-                  className="w-full px-3 py-2.5 mb-3 border border-[var(--color-border)] dark:border-slate-600 rounded-lg shadow-sm 
-                             bg-white dark:bg-slate-700 
-                             text-[var(--color-text-primary)] dark:text-slate-100
-                             placeholder-[var(--color-text-secondary)] dark:placeholder-slate-400
-                             focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-indigo-500 dark:focus:border-indigo-400"
-                />
-                <div className="flex space-x-3">
-                  <button
-                    onClick={handleLoadCustomPlaylist}
-                    className="flex-1 px-4 py-2.5 bg-indigo-500 hover:bg-indigo-600 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-slate-800 focus:ring-indigo-500 transition duration-150">
-                    Load
-                  </button>
-                  <button
-                    onClick={handleSaveToFavorites}
-                    className="flex-1 px-4 py-2.5 bg-purple-500 hover:bg-purple-600 dark:bg-purple-600 dark:hover:bg-purple-700 text-white font-semibold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-slate-800 focus:ring-purple-500 transition duration-150">
-                    Save to Favorites
-                  </button>
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    value={customPlaylistUrl}
+                    onChange={(e) => setCustomPlaylistUrl(e.target.value)}
+                    placeholder="Paste YouTube or Spotify URL here"
+                    className="w-full px-4 py-2.5 border border-[var(--color-border)] dark:border-slate-600 rounded-lg shadow-sm 
+                               bg-white dark:bg-slate-700 
+                               text-[var(--color-text-primary)] dark:text-slate-100
+                               placeholder-[var(--color-text-secondary)] dark:placeholder-slate-400
+                               focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-indigo-500 dark:focus:border-indigo-400"
+                  />
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={handleLoadClicked}
+                      disabled={isLoadingUrl || !customPlaylistUrl.trim()}
+                      className="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white font-semibold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-slate-800 focus:ring-indigo-500 transition duration-150 disabled:opacity-60 disabled:cursor-not-allowed">
+                      {isLoadingUrl && customPlaylistUrl.trim() !== ""
+                        ? "Loading..."
+                        : "Load"}
+                    </button>
+                    <button
+                      onClick={handleSaveClicked}
+                      disabled={
+                        isLoadingUrl ||
+                        (!customPlaylistUrl.trim() &&
+                          !(
+                            currentPlayer.type !== "message" &&
+                            currentPlayer.src
+                          ))
+                      } // Disable nếu cả input và player đều rỗng
+                      className="flex-1 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600 text-white font-semibold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-slate-800 focus:ring-purple-500 transition duration-150 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center">
+                      {isUrlFavorite(customPlaylistUrl.trim()) ? (
+                        <HeartSolidIcon className="w-5 h-5 mr-2 flex-shrink-0" />
+                      ) : (
+                        <HeartOutlineIcon className="w-5 h-5 mr-2 flex-shrink-0" />
+                      )}
+                      Favorite
+                    </button>
+                  </div>
                 </div>
               </section>
 
-              {/* Đường kẻ ngang phân cách */}
-              <hr className="border-gray-200 dark:border-slate-700 my-6" />
+              <hr className="border-[var(--color-border)] dark:border-slate-700/50 my-6" />
 
-              {/* Phần Flocus Playlists (hoặc Built-in Playlists) */}
-              <section>
+              {/* Phần Favorites */}
+              {favorites && favorites.length > 0 && (
+                <section aria-labelledby="favorites-heading">
+                  <h3
+                    id="favorites-heading"
+                    className="text-lg font-semibold mb-3">
+                    My Favorites{" "}
+                    <span className="text-xs font-normal text-[var(--color-text-secondary)]">
+                      ({favorites.length}/{MAX_FAVORITES})
+                    </span>
+                  </h3>
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1 -mr-1">
+                    {" "}
+                    {/* Thêm -mr-1 để scrollbar không chiếm chỗ của nút X */}
+                    {favorites.map((fav, index) => (
+                      <div
+                        key={fav.originalUrl || index}
+                        className="p-2.5 bg-gray-100 dark:bg-slate-700/80 rounded-md flex justify-between items-center group">
+                        <div
+                          className="flex items-center space-x-2 flex-1 min-w-0 cursor-pointer group/load"
+                          onClick={() =>
+                            onLoadFavorite(fav.originalUrl, fav.name)
+                          }
+                          title={`Load: ${fav.name}`}>
+                          <PlayCircleIcon className="w-6 h-6 text-indigo-500 dark:text-indigo-400 flex-shrink-0 group-hover/load:text-indigo-600 dark:group-hover/load:text-indigo-300 transition-colors" />
+                          <span className="text-sm text-[var(--color-text-primary)] dark:text-slate-200 truncate group-hover/load:text-indigo-600 dark:group-hover/load:text-indigo-300 transition-colors">
+                            {fav.name}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => onRemoveFavorite(fav.originalUrl)}
+                          title="Remove from favorites"
+                          className="p-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 opacity-50 group-hover:opacity-100 transition-opacity ml-2 flex-shrink-0 rounded-full hover:bg-red-100 dark:hover:bg-red-900/20">
+                          <XMarkIcon className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {favorites && favorites.length === 0 && (
+                <p className="text-sm text-center text-[var(--color-text-secondary)] dark:text-slate-400">
+                  Your favorite playlists will appear here.
+                </p>
+              )}
+
+              <hr className="border-[var(--color-border)] dark:border-slate-700/50 my-6" />
+
+              <section aria-labelledby="builtin-player-heading">
+                <h3
+                  id="builtin-player-heading"
+                  className="text-lg font-semibold mb-2">
+                  Built-in Player
+                </h3>
                 <p className="text-sm text-[var(--color-text-secondary)] dark:text-slate-400 mb-3">
-                  To play any of our built-in playlists, select it in{" "}
-                  <strong
-                    className="text-indigo-500 dark:text-indigo-400 cursor-pointer hover:underline"
-                    onClick={() =>
-                      alert("Chuyển đến Music Settings (Sắp có!)")
-                    }>
+                  Select a default playlist from{" "}
+                  <button
+                    className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline focus:outline-none"
+                    onClick={() => alert("Music Settings (Sắp có!)")}>
                     Music settings
-                  </strong>
+                  </button>
                   .
                 </p>
                 <button
-                  onClick={handleLoadSpotifyPlayer}
-                  className="w-full px-4 py-2.5 bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 text-white font-semibold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-slate-800 focus:ring-green-500 transition duration-150">
-                  Load Spotify Player
+                  onClick={onLoadSpotifyDefault}
+                  className="w-full px-4 py-2.5 bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white font-semibold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-slate-800 focus:ring-green-500 transition duration-150">
+                  Load Lofi Radio (Spotify)
                 </button>
-                {/* TODO: Hiển thị danh sách Flocus Playlists ở đây (dạng card) */}
-                <div className="mt-4 text-center text-xs text-gray-400 dark:text-gray-500">
-                  (Built-in playlists will appear here or in settings)
-                </div>
               </section>
             </div>
           </motion.aside>
